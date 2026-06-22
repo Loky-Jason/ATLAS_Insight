@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.security import get_current_user
+from app.models.audit_log import AuditLog
 from app.models.course import Course
 from app.models.user import User
 from app.services.import_service import parse_upload
@@ -48,18 +49,28 @@ async def import_courses(
             detail=f"Extension '{ext}' non supportée. Formats acceptés : xlsx, xls, csv.",
         )
 
-    # --- Lecture et vérification de la taille ---
+    # --- Lecture bornée : on lit par chunks pour rejeter AVANT d'allouer tout en RAM (E3a) ---
+    _CHUNK = 64 * 1024  # 64 KiB
+    chunks: list[bytes] = []
+    total = 0
     try:
-        content = await file.read()
+        while True:
+            chunk = await file.read(_CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Fichier trop volumineux (max 10 Mo).",
+                )
+            chunks.append(chunk)
+        content = b"".join(chunks)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Erreur lecture fichier upload : %s", exc)
         raise HTTPException(status_code=500, detail="Impossible de lire le fichier.")
-
-    if len(content) > _MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Fichier trop volumineux (max 10 Mo).",
-        )
 
     if len(content) == 0:
         raise HTTPException(
@@ -94,14 +105,27 @@ async def import_courses(
             db.add(course)
             inserted += 1
         except Exception as exc:
-            db_errors.append(f"Erreur insertion '{row.get('title', '?')}' : {exc}")
-            logger.warning("Erreur insertion cours import : %s", exc)
+            # F2 : message générique côté client, détail complet uniquement en log
+            logger.warning("Erreur insertion cours '%s' : %s", row.get("title", "?"), exc)
+            db_errors.append(f"Impossible d'insérer le cours '{row.get('title', '?')}'.")
 
     try:
         await db.flush()
     except Exception as exc:
         logger.error("Erreur DB flush import : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement en base.")
+
+    # AuditLog — traçabilité de l'import (M1)
+    try:
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="import_courses",
+            target=f"file:{filename} rows:{inserted}",
+        )
+        db.add(audit)
+        await db.flush()
+    except Exception as exc:
+        logger.error("Erreur écriture AuditLog import : %s", exc)
 
     logger.info(
         "Import fichier '%s' par user %s : %d insérés, %d erreurs.",

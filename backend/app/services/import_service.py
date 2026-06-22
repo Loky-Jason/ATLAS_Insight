@@ -76,11 +76,19 @@ def _clean_row(row: pd.Series) -> dict[str, Any]:
         except (ValueError, TypeError):
             return None
 
+    # Préfixes déclenchant une injection de formule dans Excel/LibreOffice (E3b)
+    _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
     def _str_or_none(val: Any) -> str | None:
         if pd.isna(val):
             return None
         s = str(val).strip()
-        return s if s else None
+        if not s:
+            return None
+        # Neutralise toute injection de formule : préfixe apostrophe si nécessaire
+        if s[0] in _FORMULA_PREFIXES:
+            s = "'" + s
+        return s
 
     status_raw = _str_or_none(row.get("status")) or "active"
     if status_raw not in ("active", "archived"):

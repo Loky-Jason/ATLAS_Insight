@@ -30,6 +30,9 @@ _ph = PasswordHasher(
 ALGORITHM = "HS256"
 COOKIE_NAME = "access_token"
 
+# Hash bidon constant pour égaliser le temps de vérification quand l'email est inconnu (E2)
+_DUMMY_HASH: str = _ph.hash("__dummy_password_for_timing_protection__")
+
 
 # ---------------------------------------------------------------------------
 # Password helpers
@@ -147,3 +150,15 @@ async def get_current_user(
         )
 
     return user
+
+
+async def require_admin(
+    current_user: Annotated[object, Depends(get_current_user)],
+) -> object:
+    """Dépendance FastAPI : exige le rôle 'admin', lève 403 sinon (E1)."""
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé aux administrateurs.",
+        )
+    return current_user

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.audit_log import AuditLog
 from app.models.course import Course
 from app.models.user import User
@@ -135,7 +135,7 @@ async def update_course(
 async def archive_course(
     course_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ) -> Course:
     """Archiver un cours (soft-delete : status → archived)."""
     course = await _get_course_or_404(course_id, db)
@@ -155,7 +155,7 @@ async def archive_course(
 async def restore_course(
     course_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ) -> Course:
     """Restaurer un cours archivé (status → active)."""
     course = await _get_course_or_404(course_id, db)

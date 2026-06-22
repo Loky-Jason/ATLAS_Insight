@@ -47,8 +47,9 @@ app = FastAPI(
     description="Backend décisionnel pour coordinateur pédagogique SCAP.paris.",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Docs désactivées en production (M4)
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
 )
 
 # --- CORS ---

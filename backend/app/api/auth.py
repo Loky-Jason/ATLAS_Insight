@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import (
     COOKIE_NAME,
+    _DUMMY_HASH,
     create_access_token,
     get_current_user,
     hash_password,
@@ -26,14 +28,19 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 _COOKIE_KWARGS = {
     "key": COOKIE_NAME,
     "httponly": True,
-    "samesite": "lax",
-    "secure": False,  # True en production HTTPS — régler via Settings
+    "samesite": "strict",
+    "secure": settings.is_production,  # True en HTTPS production uniquement
 }
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
-    """Créer un nouveau compte utilisateur."""
+    """Créer un nouveau compte utilisateur.
+
+    Le premier compte créé (bootstrap) devient automatiquement admin.
+    Tous les suivants reçoivent le rôle 'user', indépendamment de la requête.
+    Un admin authentifié peut ensuite promouvoir via l'interface d'administration.
+    """
     try:
         result = await db.execute(select(User).where(User.email == payload.email))
         existing = result.scalar_one_or_none()
@@ -47,10 +54,20 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
             detail="Un compte avec cet email existe déjà.",
         )
 
+    # Bootstrap : le premier compte devient admin, tous les suivants sont 'user'
+    try:
+        count_result = await db.execute(select(User))
+        is_first_user = count_result.scalar_one_or_none() is None
+    except Exception as exc:
+        logger.error("Erreur DB register (count) : %s", exc)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+
+    assigned_role = "admin" if is_first_user else "user"
+
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
-        role=payload.role,
+        role=assigned_role,
     )
     try:
         db.add(user)
@@ -60,7 +77,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
         logger.error("Erreur DB register (insert) : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur lors de la création du compte.")
 
-    logger.info("Nouvel utilisateur créé : %s (id=%s)", user.email, user.id)
+    logger.info("Nouvel utilisateur créé : %s (id=%s, rôle=%s)", user.email, user.id, user.role)
     return user
 
 
@@ -78,7 +95,12 @@ async def login(
         logger.error("Erreur DB login : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur serveur.")
 
-    if user is None or not verify_password(payload.password, user.password_hash):
+    # Vérification constante en temps : si l'email est inconnu, on vérifie quand même
+    # contre un hash bidon pour ne pas divulguer l'existence du compte par le timing (E2)
+    hash_to_check = user.password_hash if user is not None else _DUMMY_HASH
+    password_ok = verify_password(payload.password, hash_to_check)
+
+    if user is None or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect.",

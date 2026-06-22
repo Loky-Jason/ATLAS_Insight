@@ -19,7 +19,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 | Type | Web app **locale** (navigateur), migrable M365/Azure plus tard |
 | Frontend | React + Vite + TypeScript, Tailwind, shadcn/ui, Recharts |
 | Backend | FastAPI (Python 3.11+), SQLAlchemy 2.0, Pydantic v2 |
-| Base | SQLite (fichier local), chiffrée (SQLCipher ou chiffrement applicatif champ sensible) |
+| Base | SQLite (fichier local). Chiffrement au repos = **BitLocker** (disque OS, standard parc Mairie) ; PAS SQLCipher (wheels Windows fragiles). Champ-chiffré AES-GCM ciblé seulement si clause contractuelle l'exige. Azure gère l'at-rest nativement après migration |
 | Auth | Comptes locaux, hash **argon2** (argon2-cffi), sessions JWT httpOnly |
 | Import données | Excel/CSV via pandas + openpyxl |
 | Veille | Recherche web automatisée côté backend (WebSearch/LLM), validation humaine |

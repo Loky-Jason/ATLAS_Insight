@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    role: str = Field(default="user", pattern=r"^(user|admin)$")
+    # Le rôle n'est pas accepté du client : forcé à 'user' côté serveur (bootstrap → admin) (E1)
 
 
 class UserRead(BaseModel):

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.services.analytics_service import get_flop_courses, get_top_courses, refresh_all_scores
 
@@ -41,7 +41,7 @@ async def get_popularity(
 )
 async def refresh_scores(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_admin),
 ) -> dict[str, Any]:
     """
     Recalcule et sauvegarde le popularity_score de tous les cours actifs.

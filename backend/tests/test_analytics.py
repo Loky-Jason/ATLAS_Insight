@@ -31,9 +31,10 @@ def test_compute_raw_score_never_negative():
 # ---------------------------------------------------------------------------
 
 async def _register_and_login(client) -> None:
+    # Premier compte = admin bootstrap (role ignoré dans le schéma)
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "analyst@example.com", "password": "validpass1", "role": "admin"},
+        json={"email": "analyst@example.com", "password": "validpass1"},
     )
     await client.post(
         "/api/v1/auth/login",
