@@ -88,3 +88,15 @@ Dépendance transitive non épinglée, version majeure incompatible installée d
 `starlette>=0.41,<1.0` épinglé dans `pyproject.toml`
 ### Règle
 Épingler les dépendances transitives critiques (starlette sous FastAPI) pour isoler l'env des conflits MCP/outils
+
+## 2026-06-25 — Review Phase 1 : dérive doc/code dans services
+### Contexte
+Review 5 axes des services estimation/certification/market
+### Problème
+`certification_service` : commentaire promettait un bonus catégorie +0.15 jamais implémenté ; variable `cat_hint` contenait en fait le regex (col. 2 toujours None). `market_service._compute_relevance` : docstring (+0.5/+0.3 titre) ≠ code (+0.3/-0.4)
+### Cause
+Docstrings/commentaires écrits sur une intention initiale, code livré différent, jamais resynchronisés
+### Solution
+Renommé `cat_hint`→`pattern`, commentaires alignés sur le code réel, docstring scoring corrigée. 121/121 toujours verts
+### Règle
+Docstring = contrat : toute logique de scoring/règles doit décrire EXACTEMENT le code livré, pas l'intention. Vérifier à la review.

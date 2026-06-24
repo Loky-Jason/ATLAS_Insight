@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from difflib import SequenceMatcher
 from typing import Any, TypedDict
 
 from sqlalchemy import select
@@ -180,13 +181,10 @@ def _compute_relevance(
     """
     Score de pertinence [0, 1] pour une formation marché.
 
-    Critères :
-      +0.5 si la catégorie est présente chez SCAP (catégorie porteuse)
-      +0.3 si le titre est proche d'une demande existante (non encore couverte)
+    Critères (base 0.5) :
+      +0.3 si la catégorie est présente chez SCAP (catégorie porteuse)
       -0.4 si un cours SCAP très similaire existe déjà (doublon inutile)
     """
-    from difflib import SequenceMatcher
-
     score = 0.5  # base neutre
 
     raw_cat = (raw.get("category") or "").lower()

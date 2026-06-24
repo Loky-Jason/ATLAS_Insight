@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Référentiel de règles
 # ---------------------------------------------------------------------------
-# Chaque règle : (pattern_regex, category_hint | None, certif_type, label, rationale, base_confidence)
-# category_hint : si None → s'applique sans restriction de catégorie
-# confidence augmente de +0.15 si la catégorie correspond.
+# Chaque règle : (pattern_regex, _reserved, certif_type, label, rationale, base_confidence)
+# pattern_regex : recherché (insensible casse) dans "<titre> <catégorie>".
+# _reserved     : emplacement réservé (futur category_hint), non utilisé actuellement.
+# La catégorie est déjà intégrée au texte recherché (pas de bonus séparé pour l'instant).
 
-_RULES: list[tuple[str | None, str | None, str, str, str, float]] = [
+_RULES: list[tuple[str, str | None, str, str, str, float]] = [
     # --- RNCP ---
     (
         r"management|leadership|chef de projet|gestion d.équipe|gestion d.project",
@@ -178,9 +179,9 @@ def suggest_certifications(
     text = f"{title} {category or ''}".lower()
     suggestions: list[dict[str, Any]] = []
 
-    for cat_hint, _unused, cert_type, label, rationale, base_conf in _RULES:
+    for pattern, _reserved, cert_type, label, rationale, base_conf in _RULES:
         try:
-            if not re.search(cat_hint or r".", text, re.IGNORECASE):
+            if not re.search(pattern, text, re.IGNORECASE):
                 continue
         except re.error as exc:
             logger.warning("Regex invalide dans le référentiel certification : %s", exc)
