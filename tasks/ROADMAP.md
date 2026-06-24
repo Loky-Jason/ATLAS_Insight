@@ -22,15 +22,17 @@
 
 ## 🔜 Phase 1 — Veille, estimation, certification _(en cours)_
 
-| Module | Priorité | Dépendances | Statut |
-|--------|----------|-------------|--------|
-| **1.1** Courses CRUD frontend | P0 | API courses, router existant | ⏳ À faire |
-| **1.2** MarketCourse CRUD frontend | P0 | API market_courses | ⏳ À faire |
-| **1.3** CourseProposal CRUD frontend | P0 | API course_proposals | ⏳ À faire |
-| **1.4** Veille marché auto | P1 | API recherche web + LLM | ⏳ À faire |
-| **1.5** Estimation heures | P1 | Logique métier par similarité | ⏳ À faire |
-| **1.6** Suggestions certification | P1 | RNCP + open badge matching | ⏳ À faire |
-| **1.7** Tests Phase 1 | P1 | Chaque module | ⏳ À faire |
+| Module | Priorité | Dépendances | Spec | Statut |
+|--------|----------|-------------|------|--------|
+| **1.1** Courses CRUD frontend | P0 | API courses existant | `specs/courses-ui.md` | ⏳ À faire |
+| **1.2** MarketCourse CRUD frontend | P0 | API market_courses | `specs/market-crud.md` | ⏳ À faire |
+| **1.3** CourseProposal CRUD frontend | P0 | API course_proposals | `specs/proposals-crud.md` | ⏳ À faire |
+| **1.4** Import UI frontend | P1 | API imports existant | `specs/import-ui.md` | ⏳ À faire |
+| **1.5** Veille marché auto | P1 | API recherche web + LLM | `specs/market-veille.md` | ⏳ À faire |
+| **1.6** Favoris (Favorite model + UI) | P1 | Auth existante | `specs/favorites.md` | ⏳ À faire |
+| **1.7** Estimation heures | P1 | Logique métier par similarité | `specs/estimation.md` | ⏳ À faire |
+| **1.8** Suggestions certification | P1 | RNCP + open badge matching | `specs/certification.md` | ⏳ À faire |
+| **1.9** Tests Phase 1 | P1 | Chaque module | — | ⏳ À faire |
 
 ### Modules API backend à créer
 
@@ -38,16 +40,20 @@
 - `app/api/proposals.py` — CRUD CourseProposal
 - `app/api/estimate.py` — Endpoint estimation heures
 - `app/api/certification.py` — Suggestions certificat
-- `app/services/market_service.py` — Veille web (recherche + parsing)
+- `app/api/audit_logs.py` — GET list audit logs (paginated, admin only)
+- `app/api/favorites.py` — CRUD Favoris
+- `app/models/favorite.py` — SQLAlchemy model Favorite
+- `app/schemas/favorite.py` — Pydantic FavoriteCreate/Read
+- `app/services/market_service.py` — Veille web (recherche + parsing + score pertinence)
 - `app/services/estimation_service.py` — Calcul heures estimées
 - `app/services/certification_service.py` — Matching RNCP / open badge
-- `app/services/market_veille.py` — Agrégation veille + score pertinence
 
 ### Pages frontend à créer
 
+- `src/pages/Courses/index.tsx` — Liste CRUD avec filtres, recherche, édition
 - `src/pages/MarketWatch/index.tsx` — Tableau veille + sources + score pertinence
 - `src/pages/Proposals/index.tsx` — Liste propositions avec estim/certif
-- `src/pages/Courses/index.tsx` — Liste CRUD avec filtres, recherche, édition
+- `src/pages/Import/index.tsx` — Upload Excel/CSV avec statut et historique
 
 ---
 
@@ -69,10 +75,11 @@
 | Jalon | Date cible | Livrables |
 |-------|-----------|-----------|
 | M0 — Phase 0 | ✅ Terminé | Auth, CRUD, import, dashboard |
-| M1 — Phase 1 core | TBD | CRUD frontend complet + veille |
-| M2 — Phase 1 full | TBD | Estimation + certification |
-| M3 — Phase 2 | TBD | Export + archivage |
-| M4 — Production | TBD | Migration M365 |
+| M1a — Phase 1 CRUD | TBD | CRUD frontend complet (Courses, MarketWatch, Proposals) + Import UI |
+| M1b — Phase 1 Veille | TBD | Veille marché automatisée avec sources + score pertinence |
+| M1c — Phase 1 Estim+Certif+Fav | TBD | Estimation heures + certification + favoris |
+| M2 — Phase 2 | TBD | Export PDF/Word + archivage avancé |
+| M3 — Production | TBD | Migration M365/Entra ID |
 
 ---
 

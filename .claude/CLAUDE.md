@@ -43,6 +43,17 @@ cd frontend && npm run lint && npm run typecheck
 4. review + update lessons.md
 5. ship
 
+## Communication
+- Mode **caveman** global actif : réponses ultra-compressées (~75% tokens)
+- Commandes : `/caveman lite|full|ultra`, `/caveman-help`
+- Commits en style caveman (Conventional Commits, sujet ≤50 car.)
+
+## Délégation subagents
+- Avant de coder, vérifier si un subagent (`~/.claude/agents/*.md`) correspond à la tâche
+- Tâche complexe multi-étapes → orchestrer via `ruflo-swarm` ou `agent-organizer`
+- Tâche ciblée → lancer le subagent dédié (ex. `fastapi-developer`, `react-specialist`)
+- Compétence atomique → agent-skills (`/spec`, `/plan`, `/review`, `/ship`)
+
 ## Plugins/Skills actifs
 - **code-review-graph** (hook session)
 - **ruflo-wrapper** (orchestration swarm)

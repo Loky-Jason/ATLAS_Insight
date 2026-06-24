@@ -31,6 +31,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 ## 3. Modèle de données (entités principales)
 
 - **User** : id, email, password_hash (argon2), role, created_at.
+- **Favorite** : id, user_id (FK users), course_id (FK courses, nullable), market_course_id (FK market_courses, nullable), created_at (marquage rapide de cours/veille suivis).
 - **Course** (cours SCAP) : id, title, category, status (`active|archived`),
   enrolled_count, dropout_count, age_brackets (JSON), year, hours_estimated,
   popularity_score (calculé), source=`scap`, notes, created_at, updated_at.
@@ -47,6 +48,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 | Prompt | Module |
 |---|---|
 | Dashboard infographie populaires/impopulaires | `frontend/dashboard` + `backend/analytics` |
+| Import cours Excel/CSV | `backend/imports` + `frontend/import` |
 | Archivage cours (historique) | `Course.status=archived` + vue archives |
 | Infographie veille (sources + explication + pertinence) | `MarketCourse` + vue veille |
 | Connexion par identifiants | `backend/auth` |
@@ -54,7 +56,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 | Estimation heures cours proposé | `backend/estimation` |
 | Titres certif (RNCP, open badge) | `backend/certification` (suggestions) |
 | Export cours proposés | `backend/export` (PDF + docx) |
-| Accès rapide cours enregistré | recherche/filtre + favoris |
+| Accès rapide cours enregistré | recherche/filtre |
 | Édition données pour ajustement | CRUD éditable sur Course/MarketCourse/Proposal |
 
 ## 5. Sécurité (non négociable)
@@ -77,6 +79,9 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 
 ```
 ATLAS_Insight/
+  .claude/         # Règles projet, lessons, mémoire session
+  specs/           # Spécifications par module
+  tasks/           # Roadmap + todo
   backend/
     app/
       core/        # config, sécurité, db

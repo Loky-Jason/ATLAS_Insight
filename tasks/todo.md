@@ -3,13 +3,28 @@
 > **Phase:** 1 — Veille, estimation, certification
 > **Dernière mise à jour:** 2026-06-24
 
-## Backend — CRUD à créer
+## Spécifications (à rédiger avant chaque module)
+
+- [ ] `specs/courses-ui.md` — CRUD courses frontend
+- [ ] `specs/market-crud.md` — CRUD MarketCourse frontend
+- [ ] `specs/proposals-crud.md` — CRUD CourseProposal frontend
+- [ ] `specs/import-ui.md` — Page import frontend
+- [ ] `specs/market-veille.md` — Veille marché automatisée
+- [ ] `specs/estimation.md` — Estimation heures
+- [ ] `specs/certification.md` — Suggestions certification
+- [ ] `specs/favorites.md` — Favoris utilisateur
+
+## Backend — Routes API à créer
 
 - [ ] `app/api/market_courses.py` — CRUD MarketCourse (list, create, get, update, delete)
 - [ ] `app/api/proposals.py` — CRUD CourseProposal (list, create, get, update, delete)
 - [ ] `app/api/estimate.py` — Endpoint estimation heures
 - [ ] `app/api/certification.py` — Suggestions certificat
-- [ ] `app/services/market_service.py` — Veille web automatisée
+- [ ] `app/api/audit_logs.py` — GET list audit logs (paginated, admin only)
+- [ ] `app/api/favorites.py` — CRUD Favoris
+- [ ] `app/models/favorite.py` — SQLAlchemy model Favorite
+- [ ] `app/schemas/favorite.py` — Pydantic FavoriteCreate/Read
+- [ ] `app/services/market_service.py` — Veille web automatisée + score pertinence
 - [ ] `app/services/estimation_service.py` — Calcul heures estimées
 - [ ] `app/services/certification_service.py` — Matching RNCP / open badge
 
@@ -18,10 +33,11 @@
 - [ ] `src/pages/Courses/index.tsx` — Liste CRUD avec filtres, recherche, édition
 - [ ] `src/pages/MarketWatch/index.tsx` — Tableau veille + sources + score pertinence
 - [ ] `src/pages/Proposals/index.tsx` — Liste propositions avec estim/certif
+- [ ] `src/pages/Import/index.tsx` — Upload Excel/CSV avec statut et historique
 
 ## Infrastructure
 
-- [ ] Ajouter routes manquantes dans `app/main.py` (market_courses, proposals)
+- [ ] Ajouter routes manquantes dans `app/main.py` (market_courses, proposals, audit_logs)
 - [ ] Ajouter endpoints API manquants dans `src/lib/api.ts`
 - [ ] Ajouter tests pour chaque nouveau module
 
