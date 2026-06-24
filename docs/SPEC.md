@@ -56,7 +56,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 | Estimation heures cours proposé | `backend/estimation` |
 | Titres certif (RNCP, open badge) | `backend/certification` (suggestions) |
 | Export cours proposés | `backend/export` (PDF + docx) |
-| Accès rapide cours enregistré | recherche/filtre |
+| Accès rapide cours enregistré | recherche/filtre + favoris (`Favorite`) |
 | Édition données pour ajustement | CRUD éditable sur Course/MarketCourse/Proposal |
 
 ## 5. Sécurité (non négociable)

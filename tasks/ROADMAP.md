@@ -15,7 +15,7 @@
 | Import Excel/CSV | ✅ | pandas + openpyxl, protection injection formules, validation colonnes |
 | Analytics | ✅ | Popularity score, top/flop, refresh endpoint |
 | Dashboard UI | ✅ | Recharts bar charts, stats cards, fallback mock data |
-| Tests | ✅ | 3 suites (auth, analytics, import) — 24+ tests |
+| Tests | ✅ | 3 suites (auth, analytics, import) — 36/36 tests |
 | Sécurité | ✅ | Timing attack protection, audit logs, soft-delete, upload limits |
 
 ---
