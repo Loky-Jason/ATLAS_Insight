@@ -27,9 +27,11 @@ from app.models.course import Course
 logger = logging.getLogger(__name__)
 
 # Score de similarité minimum pour qu'un cours soit considéré « similaire »
-_MIN_SIMILARITY = 0.20
+_MIN_SIMILARITY = 0.35
 # Poids minimal appliqué à chaque cours retenu (évite poids nul)
 _MIN_WEIGHT = 0.05
+# Nombre max de cours de référence retournés dans `basis` (les plus similaires)
+_MAX_BASIS = 5
 
 
 def _token_overlap(a: str, b: str) -> float:
@@ -96,6 +98,9 @@ async def estimate_hours(
             scored.append((c, max(sim, _MIN_WEIGHT)))
 
     if scored:
+        # Garde les N cours les plus similaires (référence bornée + cohérente avec `basis`)
+        scored.sort(key=lambda cw: cw[1], reverse=True)
+        scored = scored[:_MAX_BASIS]
         values = [(c.hours_estimated, w) for c, w in scored]  # type: ignore[misc]
         est = _weighted_mean(values)
         basis = [
@@ -125,7 +130,7 @@ async def estimate_hours(
                 {"id": c.id, "title": c.title, "category": c.category,
                  "hours_estimated": c.hours_estimated, "similarity": None}
                 for c in same_cat if c.hours_estimated is not None
-            ]
+            ][:_MAX_BASIS]
             return {
                 "estimated_hours": round(est, 1),
                 "method": "category_average",
@@ -141,7 +146,7 @@ async def estimate_hours(
             {"id": c.id, "title": c.title, "category": c.category,
              "hours_estimated": c.hours_estimated, "similarity": None}
             for c in all_courses if c.hours_estimated is not None
-        ]
+        ][:_MAX_BASIS]
         return {
             "estimated_hours": round(est, 1),
             "method": "global_average",

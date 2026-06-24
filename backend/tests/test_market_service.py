@@ -208,7 +208,7 @@ async def test_market_scan_endpoint_non_admin_forbidden(client):
 async def test_market_scan_endpoint_admin_success(client, db_session):
     await _register_and_login_admin(client)
     resp = await client.post("/api/v1/market/scan")
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     data = resp.json()
     assert "inserted" in data
     assert "skipped" in data
@@ -238,8 +238,8 @@ async def test_market_scan_endpoint_idempotent(client, db_session):
     await _register_and_login_admin(client)
     resp1 = await client.post("/api/v1/market/scan")
     resp2 = await client.post("/api/v1/market/scan")
-    assert resp1.status_code == 200
-    assert resp2.status_code == 200
+    assert resp1.status_code == 201
+    assert resp2.status_code == 201
     assert resp2.json()["inserted"] == 0
 
 
@@ -247,7 +247,7 @@ async def test_market_scan_endpoint_idempotent(client, db_session):
 async def test_market_scan_endpoint_custom_query(client):
     await _register_and_login_admin(client)
     resp = await client.post("/api/v1/market/scan?query=formation+management+Paris")
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
 
 @pytest.mark.asyncio

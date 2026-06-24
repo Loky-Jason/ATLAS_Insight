@@ -100,3 +100,13 @@ Docstrings/commentaires écrits sur une intention initiale, code livré différe
 Renommé `cat_hint`→`pattern`, commentaires alignés sur le code réel, docstring scoring corrigée. 121/121 toujours verts
 ### Règle
 Docstring = contrat : toute logique de scoring/règles doit décrire EXACTEMENT le code livré, pas l'intention. Vérifier à la review.
+
+## 2026-06-25 — Suggestions review appliquées (estimation + scan 201)
+### Contexte
+Finalisation review Phase 1 : cap `basis`, seuil similarité, code HTTP scan
+### Problème
+`basis` non borné (affichage Proposals), seuil `_MIN_SIMILARITY=0.20` trop permissif ; `/market/scan` renvoyait 200 alors qu'il crée des ressources
+### Solution
+`_MAX_BASIS=5` (tri desc + slice sur les 3 chemins), seuil monté à 0.35, scan → 201 ; 3 tests asserts 200→201 mis à jour
+### Règle
+Endpoint qui crée des ressources → 201. Toute liste renvoyée au front = bornée. Changer un code HTTP = MAJ les tests qui l'assertent dans la foulée.

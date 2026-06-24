@@ -61,7 +61,7 @@ async def _write_audit(db: AsyncSession, user_id: int, action: str, target: str)
     "/scan",
     response_model=MarketScanResponse,
     summary="Déclencher une veille marché (admin)",
-    status_code=200,
+    status_code=201,
 )
 async def trigger_market_scan(
     query: str = Query(
