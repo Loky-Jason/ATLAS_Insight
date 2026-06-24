@@ -16,9 +16,12 @@ from app.core.db import init_db
 from app.api.analytics import router as analytics_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.auth import router as auth_router
+from app.api.certification import router as certification_router
 from app.api.courses import router as courses_router
+from app.api.estimate import router as estimate_router
 from app.api.favorites import router as favorites_router
 from app.api.imports import router as imports_router
+from app.api.market import router as market_router
 from app.api.market_courses import router as market_courses_router
 from app.api.proposals import router as proposals_router
 
@@ -69,9 +72,12 @@ app.add_middleware(
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(audit_logs_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(certification_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
+app.include_router(estimate_router, prefix="/api/v1")
 app.include_router(favorites_router, prefix="/api/v1")
 app.include_router(imports_router, prefix="/api/v1")
+app.include_router(market_router, prefix="/api/v1")
 app.include_router(market_courses_router, prefix="/api/v1")
 app.include_router(proposals_router, prefix="/api/v1")
 
