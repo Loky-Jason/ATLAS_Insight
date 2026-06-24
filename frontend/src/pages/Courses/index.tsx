@@ -98,8 +98,8 @@ function CourseModal({
         course
           ? {
               title: course.title,
-              category: course.category,
-              year: course.year,
+              category: course.category ?? '',
+              year: course.year ?? new Date().getFullYear(),
               hours_estimated: course.hours_estimated,
               notes: course.notes ?? '',
             }
@@ -235,12 +235,12 @@ export function CoursesPage() {
   }, [])
 
   const categories = useMemo(() => {
-    const set = new Set(courses.map((c) => c.category))
+    const set = new Set(courses.map((c) => c.category).filter((cat): cat is string => cat !== null))
     return Array.from(set).sort()
   }, [courses])
 
   const years = useMemo(() => {
-    const set = new Set(courses.map((c) => c.year))
+    const set = new Set(courses.map((c) => c.year).filter((y): y is number => y !== null))
     return Array.from(set).sort((a, b) => b - a)
   }, [courses])
 
@@ -431,7 +431,7 @@ export function CoursesPage() {
                       {course.dropout_count}
                     </td>
                     <td className="px-4 py-3">
-                      <PopularityBar score={course.popularity_score} />
+                      <PopularityBar score={course.popularity_score ?? 0} />
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                       {course.year}

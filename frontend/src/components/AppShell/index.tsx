@@ -5,6 +5,7 @@ import {
   TrendingUp,
   Lightbulb,
   Archive,
+  Upload,
   LogOut,
   ChevronRight,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/courses', label: 'Cours SCAP', icon: BookOpen },
   { to: '/market-watch', label: 'Veille marché', icon: TrendingUp },
   { to: '/proposals', label: 'Propositions', icon: Lightbulb },
+  { to: '/import', label: 'Import', icon: Upload },
   { to: '/archives', label: 'Archives', icon: Archive },
 ] as const
 
