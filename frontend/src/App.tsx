@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/Dashboard'
 import { CoursesPage } from './pages/Courses'
 import { MarketWatchPage } from './pages/MarketWatch'
 import { ProposalsPage } from './pages/Proposals'
+import { ImportPage } from './pages/Import'
 import { ArchivesPage } from './pages/Archives'
 
 // Garde de route : redirige vers /login si non authentifié
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="courses" element={<CoursesPage />} />
         <Route path="market-watch" element={<MarketWatchPage />} />
         <Route path="proposals" element={<ProposalsPage />} />
+        <Route path="import" element={<ImportPage />} />
         <Route path="archives" element={<ArchivesPage />} />
       </Route>
 

@@ -3,7 +3,8 @@
 from app.models.audit_log import AuditLog
 from app.models.course import Course
 from app.models.course_proposal import CourseProposal
+from app.models.favorite import Favorite
 from app.models.market_course import MarketCourse
 from app.models.user import User
 
-__all__ = ["User", "Course", "MarketCourse", "CourseProposal", "AuditLog"]
+__all__ = ["User", "Course", "MarketCourse", "CourseProposal", "AuditLog", "Favorite"]

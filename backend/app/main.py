@@ -13,10 +13,14 @@ from app.core.config import settings
 from app.core.db import init_db
 
 # Routers
+from app.api.analytics import router as analytics_router
+from app.api.audit_logs import router as audit_logs_router
 from app.api.auth import router as auth_router
 from app.api.courses import router as courses_router
+from app.api.favorites import router as favorites_router
 from app.api.imports import router as imports_router
-from app.api.analytics import router as analytics_router
+from app.api.market_courses import router as market_courses_router
+from app.api.proposals import router as proposals_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,10 +66,14 @@ app.add_middleware(
 )
 
 # --- Routers ---
+app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(audit_logs_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
+app.include_router(favorites_router, prefix="/api/v1")
 app.include_router(imports_router, prefix="/api/v1")
-app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(market_courses_router, prefix="/api/v1")
+app.include_router(proposals_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------

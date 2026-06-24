@@ -71,6 +71,12 @@ export const api = {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     }),
 
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: 'PATCH',
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    }),
+
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 
   // Upload multipart (import fichier)
@@ -116,4 +122,50 @@ export interface AnalyticsPopularity {
   total_courses: number
   total_enrolled: number
   total_dropouts: number
+}
+
+export interface MarketCourse {
+  id: number
+  title: string
+  school: string | null
+  source_url: string | null
+  summary: string | null
+  relevance_score: number | null
+  why_it_works: string | null
+  related_scap_course_id: number | null
+  status: 'candidate' | 'reviewed' | 'adopted' | 'rejected'
+  discovered_at: string
+}
+
+export interface CourseProposal {
+  id: number
+  title: string
+  description: string | null
+  hours_estimated: number | null
+  certification_suggestions: string | null
+  based_on: string | null
+  status: 'draft' | 'proposed' | 'exported'
+  created_at: string
+}
+
+export interface Favorite {
+  id: number
+  user_id: number
+  course_id: number | null
+  market_course_id: number | null
+  created_at: string
+}
+
+export interface ImportResult {
+  inserted: number
+  errors: string[]
+  filename: string
+}
+
+export interface AuditLogEntry {
+  id: number
+  user_id: number | null
+  action: string
+  target: string | null
+  timestamp: string
 }
