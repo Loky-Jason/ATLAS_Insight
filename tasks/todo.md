@@ -1,7 +1,7 @@
 # TODOs — Session courante
 
-> **Phase:** 1 — Veille, estimation, certification
-> **Dernière mise à jour:** 2026-06-24
+> **Phase:** 1 — quasi terminée (CRUD + services + frontend) ; reste design + provider veille réel
+> **Dernière mise à jour:** 2026-06-25
 
 ## Spécifications (à rédiger avant chaque module)
 
@@ -26,24 +26,33 @@
 - [ ] `app/api/certification.py` — Suggestions certificat
 - [ ] `app/services/market_service.py` — Veille web automatisée + score pertinence
 - [ ] `app/services/estimation_service.py` — Calcul heures estimées
-- [ ] `app/services/certification_service.py` — Matching RNCP / open badge
+- [x] `app/services/estimation_service.py` — heures par similarité
+- [x] `app/services/certification_service.py` — Matching RNCP / open badge
+- [x] `app/services/market_service.py` + `app/api/market.py` — veille (StubProvider)
+- [ ] Brancher provider veille web RÉEL dans `get_market_provider()` (WebSearch/LLM)
 
 ## Frontend — Pages à implémenter
 
-- [ ] `src/pages/Courses/index.tsx` — Liste CRUD avec filtres, recherche, édition
-- [ ] `src/pages/MarketWatch/index.tsx` — Tableau veille + sources + score pertinence
-- [ ] `src/pages/Proposals/index.tsx` — Liste propositions avec estim/certif
-- [ ] `src/pages/Import/index.tsx` — Upload Excel/CSV avec statut et historique
+- [x] `src/pages/Courses/index.tsx` — CRUD + filtres + favori
+- [x] `src/pages/MarketWatch/index.tsx` — Tableau veille + sources + score
+- [x] `src/pages/Proposals/index.tsx` — propositions + estim/certif
+- [x] `src/pages/Import/index.tsx` — Upload Excel/CSV + résultat
 
 ## Infrastructure
 
-- [ ] Ajouter routes manquantes dans `app/main.py` (market_courses, proposals, audit_logs)
-- [ ] Ajouter endpoints API manquants dans `src/lib/api.ts`
-- [ ] Ajouter tests pour chaque nouveau module
+- [x] Routes câblées dans `app/main.py` (8 routers + estimate/certification/market)
+- [x] Endpoints ajoutés dans `src/lib/api.ts`
+- [x] Tests par module (backend 121/121, frontend build vert)
 
-## Qualité
+## Reste Phase 1 / vers Phase 2
 
-- [ ] `npm run lint` + `npm run typecheck` avant chaque livraison
+- [ ] Passe design `ui-ux-pro-max` → `emil-design-eng` → `impeccable` sur les pages
+- [ ] Provider veille web réel (point d'intégration market_service)
+- [ ] Phase 2 : export PDF/Word, vue Archives, migration M365
+
+## Qualité (rappel continu)
+
+- [ ] `npm run build` + `tsc --noEmit` avant chaque livraison
 - [ ] `python -m pytest -v` après chaque module backend
 - [ ] Relecture `impeccable` sur les nouvelles pages frontend
 - [ ] MAJ `lessons.md` après chaque review

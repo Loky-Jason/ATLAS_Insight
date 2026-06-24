@@ -20,19 +20,20 @@
 
 ---
 
-## 🔜 Phase 1 — Veille, estimation, certification _(en cours)_
+## 🔜 Phase 1 — Veille, estimation, certification _(quasi terminée)_
 
 | Module | Priorité | Dépendances | Spec | Statut |
 |--------|----------|-------------|------|--------|
-| **1.1** Courses CRUD frontend | P0 | API courses existant | `specs/courses-ui.md` | ⏳ À faire |
-| **1.2** MarketCourse CRUD frontend | P0 | API market_courses | `specs/market-crud.md` | ⏳ À faire |
-| **1.3** CourseProposal CRUD frontend | P0 | API course_proposals | `specs/proposals-crud.md` | ⏳ À faire |
-| **1.4** Import UI frontend | P1 | API imports existant | `specs/import-ui.md` | ⏳ À faire |
-| **1.5** Veille marché auto | P1 | API recherche web + LLM | `specs/market-veille.md` | ⏳ À faire |
-| **1.6** Favoris (Favorite model + UI) | P1 | Auth existante | `specs/favorites.md` | ⏳ À faire |
-| **1.7** Estimation heures | P1 | Logique métier par similarité | `specs/estimation.md` | ⏳ À faire |
-| **1.8** Suggestions certification | P1 | RNCP + open badge matching | `specs/certification.md` | ⏳ À faire |
-| **1.9** Tests Phase 1 | P1 | Chaque module | — | ⏳ À faire |
+| **1.1** Courses CRUD frontend | P0 | API courses existant | `specs/courses-ui.md` | ✅ Fait (build vert) |
+| **1.2** MarketCourse CRUD frontend | P0 | API market_courses | `specs/market-crud.md` | ✅ Fait |
+| **1.3** CourseProposal CRUD frontend | P0 | API course_proposals | `specs/proposals-crud.md` | ✅ Fait |
+| **1.4** Import UI frontend | P1 | API imports existant | `specs/import-ui.md` | ✅ Fait |
+| **1.5** Veille marché auto | P1 | API recherche web + LLM | `specs/market-veille.md` | 🟡 Stub livré — provider web réel à brancher (`get_market_provider()`) |
+| **1.6** Favoris (Favorite model + UI) | P1 | Auth existante | `specs/favorites.md` | ✅ Backend fait ; UI bouton favori dans Courses |
+| **1.7** Estimation heures | P1 | Logique métier par similarité | `specs/estimation.md` | ✅ Fait (difflib + fallbacks) |
+| **1.8** Suggestions certification | P1 | RNCP + open badge matching | `specs/certification.md` | ✅ Fait (14 règles) |
+| **1.9** Tests Phase 1 | P1 | Chaque module | — | ✅ Backend 121/121 ; frontend build vert |
+| **1.10** Passe design (ui-ux-pro-max → impeccable) | P1 | Pages Phase 1 | — | ⏳ À faire |
 
 ### Modules API backend
 
@@ -41,11 +42,11 @@
 - ✅ `app/api/audit_logs.py` — GET list audit logs (paginé, admin only)
 - ✅ `app/api/favorites.py` — CRUD Favoris (isolés par user)
 - ✅ `app/models/favorite.py` + `app/schemas/favorite.py` — Favorite (model_validator: exactement 1 FK)
-- ⏳ `app/api/estimate.py` — Endpoint estimation heures
-- ⏳ `app/api/certification.py` — Suggestions certificat
-- ⏳ `app/services/market_service.py` — Veille web (recherche + parsing + score pertinence)
-- ⏳ `app/services/estimation_service.py` — Calcul heures estimées
-- ⏳ `app/services/certification_service.py` — Matching RNCP / open badge
+- ✅ `app/api/estimate.py` — POST `/estimate/hours` (similarité difflib)
+- ✅ `app/api/certification.py` — POST `/certification/suggest` (14 règles)
+- ✅ `app/api/market.py` — POST `/market/scan` (admin) + `market_service.py` (StubProvider, scoring) — provider web réel à brancher
+- ✅ `app/services/estimation_service.py` — Calcul heures estimées
+- ✅ `app/services/certification_service.py` — Matching RNCP / open badge
 
 ### Pages frontend à créer
 

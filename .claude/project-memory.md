@@ -1,5 +1,5 @@
 ﻿# Memory — ATLAS_Insight
-**Last:** 2026-06-25 — Sprint backend Phase 1 (CRUD) livré, 75/75 tests
+**Last:** 2026-06-25 — Phase 1 quasi terminée : CRUD + services (estim/certif/veille stub) + frontend CRUD. Backend 121/121, frontend build vert
 
 ## Architecture
 
@@ -9,15 +9,17 @@
 - `app/schemas/` — Pydantic v2 (Create/Update/Read par entité)
 - `app/api/` — 8 routers : auth, courses, imports, analytics, **market_courses, proposals, favorites, audit_logs** (Phase 1)
 - `app/models/` — +Favorite (FK course OU market_course, 1 seule via model_validator)
-- `app/services/` — analytics_service (popularity score), import_service (Excel/CSV parser)
-- `tests/` — Pytest async, **75/75** (auth, analytics, import, market_courses, proposals, favorites, audit_logs)
+- `app/services/` — analytics, import, **estimation (difflib), certification (14 règles), market (StubProvider, scoring vs offre SCAP)**
+- Endpoints métier : POST `/estimate/hours`, `/certification/suggest`, `/market/scan` (admin). Provider veille web réel = point d'intégration `get_market_provider()`
+- `tests/` — Pytest async, **121/121** (auth, analytics, import, market_courses, proposals, favorites, audit_logs)
 - API préfixe `/api/v1`. Mutations destructives = require_admin + AuditLog. Favoris isolés par user.
 
 ### Frontend — React 18 + Vite 6 + TS strict
 - `src/lib/` — api.ts (fetch client), auth.tsx (AuthProvider + useAuth), utils.ts (cn)
 - `src/components/` — AppShell (sidebar layout), ui/ (shadcn Button, Card, Input, Label)
-- `src/pages/` — Login (OK), Dashboard (OK + mock data fallback), Courses/MarketWatch/Proposals/Archives (placeholders)
-- Routes : `/login`, `/dashboard`, `/courses`, `/market-watch`, `/proposals`, `/archives`
+- `src/pages/` — Login, Dashboard, **Courses/MarketWatch/Proposals/Import (CRUD complet)**, Archives (placeholder Phase 2)
+- `src/components/ui/` — +dialog (CRUD modals)
+- Routes : `/login`, `/dashboard`, `/courses`, `/market-watch`, `/proposals`, `/import`, `/archives`
 
 ### Base — SQLite
 - Fichier : `data/atlas.db` (gitignored)
