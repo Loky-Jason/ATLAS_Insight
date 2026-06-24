@@ -64,3 +64,27 @@ Pas de nettoyage des valeurs textuelles importées
 Prefix `'` automatique sur les valeurs commençant par un opérateur de formule (E3b)
 ### Règle
 Neutraliser les formules Excel à l'import, pas seulement valider les types
+
+## 2026-06-25 — Validation cross-champ Pydantic v2
+### Contexte
+Schema Favorite : contrainte « exactement une des 2 FK (course_id / market_course_id) renseignée »
+### Problème
+`field_validator` ne voyait pas les autres champs → contrainte impossible à vérifier
+### Cause
+En Pydantic v2, un `field_validator` par champ s'exécute avant que les autres champs soient validés
+### Solution
+`model_validator(mode="after")` qui a accès à l'instance complète
+### Règle
+Toute contrainte portant sur plusieurs champs → `model_validator(mode="after")`, jamais `field_validator`
+
+## 2026-06-25 — Conflit starlette / FastAPI
+### Contexte
+Sprint backend Phase 1 — lancement pytest
+### Problème
+Starlette 1.3.1 (tiré par `mcp`) incompatible FastAPI 0.115.12 ; tests cassés
+### Cause
+Dépendance transitive non épinglée, version majeure incompatible installée dans l'env
+### Solution
+`starlette>=0.41,<1.0` épinglé dans `pyproject.toml`
+### Règle
+Épingler les dépendances transitives critiques (starlette sous FastAPI) pour isoler l'env des conflits MCP/outils

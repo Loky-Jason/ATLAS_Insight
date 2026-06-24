@@ -16,14 +16,14 @@
 
 ## Backend — Routes API à créer
 
-- [ ] `app/api/market_courses.py` — CRUD MarketCourse (list, create, get, update, delete)
-- [ ] `app/api/proposals.py` — CRUD CourseProposal (list, create, get, update, delete)
+- [x] `app/api/market_courses.py` — CRUD MarketCourse (75/75 tests)
+- [x] `app/api/proposals.py` — CRUD CourseProposal
+- [x] `app/api/audit_logs.py` — GET list audit logs (paginated, admin only)
+- [x] `app/api/favorites.py` — CRUD Favoris (isolés par user)
+- [x] `app/models/favorite.py` — SQLAlchemy model Favorite
+- [x] `app/schemas/favorite.py` — Pydantic FavoriteCreate/Read
 - [ ] `app/api/estimate.py` — Endpoint estimation heures
 - [ ] `app/api/certification.py` — Suggestions certificat
-- [ ] `app/api/audit_logs.py` — GET list audit logs (paginated, admin only)
-- [ ] `app/api/favorites.py` — CRUD Favoris
-- [ ] `app/models/favorite.py` — SQLAlchemy model Favorite
-- [ ] `app/schemas/favorite.py` — Pydantic FavoriteCreate/Read
 - [ ] `app/services/market_service.py` — Veille web automatisée + score pertinence
 - [ ] `app/services/estimation_service.py` — Calcul heures estimées
 - [ ] `app/services/certification_service.py` — Matching RNCP / open badge

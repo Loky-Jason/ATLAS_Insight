@@ -34,19 +34,18 @@
 | **1.8** Suggestions certification | P1 | RNCP + open badge matching | `specs/certification.md` | ⏳ À faire |
 | **1.9** Tests Phase 1 | P1 | Chaque module | — | ⏳ À faire |
 
-### Modules API backend à créer
+### Modules API backend
 
-- `app/api/market_courses.py` — CRUD MarketCourse
-- `app/api/proposals.py` — CRUD CourseProposal
-- `app/api/estimate.py` — Endpoint estimation heures
-- `app/api/certification.py` — Suggestions certificat
-- `app/api/audit_logs.py` — GET list audit logs (paginated, admin only)
-- `app/api/favorites.py` — CRUD Favoris
-- `app/models/favorite.py` — SQLAlchemy model Favorite
-- `app/schemas/favorite.py` — Pydantic FavoriteCreate/Read
-- `app/services/market_service.py` — Veille web (recherche + parsing + score pertinence)
-- `app/services/estimation_service.py` — Calcul heures estimées
-- `app/services/certification_service.py` — Matching RNCP / open badge
+- ✅ `app/api/market_courses.py` — CRUD MarketCourse (list/get/create/update, delete admin+audit) — **75/75 tests**
+- ✅ `app/api/proposals.py` — CRUD CourseProposal (idem)
+- ✅ `app/api/audit_logs.py` — GET list audit logs (paginé, admin only)
+- ✅ `app/api/favorites.py` — CRUD Favoris (isolés par user)
+- ✅ `app/models/favorite.py` + `app/schemas/favorite.py` — Favorite (model_validator: exactement 1 FK)
+- ⏳ `app/api/estimate.py` — Endpoint estimation heures
+- ⏳ `app/api/certification.py` — Suggestions certificat
+- ⏳ `app/services/market_service.py` — Veille web (recherche + parsing + score pertinence)
+- ⏳ `app/services/estimation_service.py` — Calcul heures estimées
+- ⏳ `app/services/certification_service.py` — Matching RNCP / open badge
 
 ### Pages frontend à créer
 
