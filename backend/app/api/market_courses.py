@@ -59,6 +59,7 @@ async def list_market_courses(
     search: str | None = Query(default=None, description="Recherche dans le titre"),
     min_relevance_score: float | None = Query(default=None, ge=0.0, le=1.0),
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> list[MarketCourse]:
     """Lister les formations du marché avec filtres optionnels."""
     stmt = select(MarketCourse)
@@ -86,6 +87,7 @@ async def list_market_courses(
 async def create_market_course(
     payload: MarketCourseCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> MarketCourse:
     """Créer une nouvelle formation issue de la veille marché."""
     mc = MarketCourse(**payload.model_dump())
@@ -103,6 +105,7 @@ async def create_market_course(
 async def get_market_course(
     market_course_id: int,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> MarketCourse:
     """Récupérer une formation marché par son identifiant."""
     return await _get_market_course_or_404(market_course_id, db)

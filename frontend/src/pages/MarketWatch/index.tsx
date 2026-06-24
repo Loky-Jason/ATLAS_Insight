@@ -102,6 +102,7 @@ function MarketCourseModal({
 }) {
   const [form, setForm] = useState<MarketCourseForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const isEdit = course !== null
 
   useEffect(() => {
@@ -125,9 +126,13 @@ function MarketCourseModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setErrorMsg(null)
     try {
       await onSave(form)
       onOpenChange(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur d'enregistrement"
+      setErrorMsg(msg)
     } finally {
       setSaving(false)
     }
@@ -144,6 +149,12 @@ function MarketCourseModal({
               : 'Ajoutez un cours repéré sur le marché parisien.'}
           </DialogDescription>
         </DialogHeader>
+        {errorMsg && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="mw-title">Titre</Label>
@@ -303,12 +314,18 @@ export function MarketWatchPage() {
   }
 
   const handleSave = async (form: MarketCourseForm) => {
-    if (editingCourse) {
-      await api.patch(`/market-courses/${editingCourse.id}`, form)
-    } else {
-      await api.post('/market-courses', form)
+    try {
+      if (editingCourse) {
+        await api.patch(`/market-courses/${editingCourse.id}`, form)
+      } else {
+        await api.post('/market-courses', form)
+      }
+      await fetchCourses()
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Erreur inconnue'
+      setErrorMsg(msg)
+      throw err
     }
-    await fetchCourses()
   }
 
   const handleDelete = async (id: number) => {

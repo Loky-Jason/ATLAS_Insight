@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user
+from app.models.audit_log import AuditLog
 from app.models.favorite import Favorite
 from app.models.user import User
 from app.schemas.favorite import FavoriteCreate, FavoriteRead
@@ -66,6 +67,23 @@ async def create_favorite(
     current_user: User = Depends(get_current_user),
 ) -> Favorite:
     """Ajouter un favori (formation SCAP ou veille marché)."""
+    if payload.course_id is not None:
+        stmt = select(Favorite).where(
+            Favorite.user_id == current_user.id,
+            Favorite.course_id == payload.course_id,
+        )
+    else:
+        stmt = select(Favorite).where(
+            Favorite.user_id == current_user.id,
+            Favorite.market_course_id == payload.market_course_id,
+        )
+    try:
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+    except Exception as exc:
+        logger.error("Erreur DB check duplicate favorite : %s", exc)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+    if existing:
+        raise HTTPException(status_code=409, detail="Ce favori existe déjà.")
     fav = Favorite(
         user_id=current_user.id,
         course_id=payload.course_id,
@@ -95,6 +113,8 @@ async def delete_favorite(
             detail="Vous ne pouvez pas supprimer un favori qui ne vous appartient pas.",
         )
     try:
+        log = AuditLog(user_id=current_user.id, action="delete_favorite", target=f"favorite:{favorite_id}")
+        db.add(log)
         await db.delete(fav)
         await db.flush()
     except Exception as exc:

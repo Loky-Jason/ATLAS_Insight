@@ -24,12 +24,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let response: Response
   try {
+    const isFormData = init.body instanceof FormData
     response = await fetch(url, {
       ...init,
-      credentials: 'include', // envoie les cookies httpOnly
+      credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
-        ...init.headers,
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        ...init.headers as Record<string, string>,
       },
     })
   } catch (err) {

@@ -75,6 +75,7 @@ function ProposalModal({
 }) {
   const [form, setForm] = useState<CourseProposalForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const isEdit = proposal !== null
 
   useEffect(() => {
@@ -97,9 +98,13 @@ function ProposalModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setErrorMsg(null)
     try {
       await onSave(form)
       onOpenChange(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur d'enregistrement"
+      setErrorMsg(msg)
     } finally {
       setSaving(false)
     }
@@ -118,6 +123,12 @@ function ProposalModal({
               : "Créez une nouvelle proposition de cours."}
           </DialogDescription>
         </DialogHeader>
+        {errorMsg && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="prop-title">Titre</Label>
@@ -255,12 +266,18 @@ export function ProposalsPage() {
   }
 
   const handleSave = async (form: CourseProposalForm) => {
-    if (editingProposal) {
-      await api.patch(`/proposals/${editingProposal.id}`, form)
-    } else {
-      await api.post('/proposals', form)
+    try {
+      if (editingProposal) {
+        await api.patch(`/proposals/${editingProposal.id}`, form)
+      } else {
+        await api.post('/proposals', form)
+      }
+      await fetchProposals()
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Erreur inconnue'
+      setErrorMsg(msg)
+      throw err
     }
-    await fetchProposals()
   }
 
   if (loadState === 'loading') {

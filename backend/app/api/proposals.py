@@ -57,6 +57,7 @@ async def list_proposals(
     status_filter: str | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None, description="Recherche dans le titre"),
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> list[CourseProposal]:
     """Lister les propositions de formation avec filtres optionnels."""
     stmt = select(CourseProposal)
@@ -80,6 +81,7 @@ async def list_proposals(
 async def create_proposal(
     payload: CourseProposalCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CourseProposal:
     """Créer une nouvelle proposition de formation."""
     proposal = CourseProposal(**payload.model_dump())
@@ -97,6 +99,7 @@ async def create_proposal(
 async def get_proposal(
     proposal_id: int,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> CourseProposal:
     """Récupérer une proposition par son identifiant."""
     return await _get_proposal_or_404(proposal_id, db)

@@ -9,6 +9,7 @@ import {
   Files,
 } from 'lucide-react'
 import { api, ApiError, type Course } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -204,6 +205,8 @@ function CourseModal({
 }
 
 export function CoursesPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [courses, setCourses] = useState<Course[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -443,18 +446,20 @@ export function CoursesPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title={course.status === 'active' ? 'Archiver' : 'Restaurer'}
-                          onClick={() => void handleArchive(course)}
-                        >
-                          {course.status === 'active' ? (
-                            <Archive className="h-4 w-4" />
-                          ) : (
-                            <RotateCcw className="h-4 w-4" />
-                          )}
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={course.status === 'active' ? 'Archiver' : 'Restaurer'}
+                            onClick={() => void handleArchive(course)}
+                          >
+                            {course.status === 'active' ? (
+                              <Archive className="h-4 w-4" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
