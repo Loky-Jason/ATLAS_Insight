@@ -28,6 +28,7 @@ from app.api.schools import router as schools_router
 from app.api.school_courses import router as school_courses_router
 from app.api.scan_runs import router as scan_runs_router
 from app.api.dashboard import router as dashboard_router
+from app.api.gap_recommendations import router as gap_recommendations_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,6 +89,7 @@ app.include_router(schools_router, prefix="/api/v1")
 app.include_router(school_courses_router, prefix="/api/v1")
 app.include_router(scan_runs_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(gap_recommendations_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------

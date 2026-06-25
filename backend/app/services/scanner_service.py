@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.gap_recommendation import GapRecommendation
 from app.models.market_scan_run import MarketScanRun
 from app.models.school_course import SchoolCourse
 from app.models.school_registry import SchoolRegistry
@@ -327,9 +328,19 @@ async def get_dashboard_counts(db: AsyncSession) -> dict[str, int]:
         )
         unreviewed_scans: int = unrev.scalar() or 0
 
-        # GapRecommendation counts — Phase 1c (toujours 0 pour l'instant)
-        closure_candidates = 0
-        creation_suggestions = 0
+        closure_q = await db.execute(
+            select(func.count(GapRecommendation.id)).where(
+                GapRecommendation.recommendation_type == "closure"
+            )
+        )
+        closure_candidates: int = closure_q.scalar() or 0
+
+        creation_q = await db.execute(
+            select(func.count(GapRecommendation.id)).where(
+                GapRecommendation.recommendation_type == "creation"
+            )
+        )
+        creation_suggestions: int = creation_q.scalar() or 0
     except Exception as exc:
         logger.error("Erreur get_dashboard_counts : %s", exc)
         raise
