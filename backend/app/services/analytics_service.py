@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course import Course
@@ -19,6 +19,28 @@ from app.models.course import Course
 logger = logging.getLogger(__name__)
 
 _DROPOUT_WEIGHT = 1.5
+
+
+async def get_totals(db: AsyncSession) -> dict[str, int]:
+    """Agrégats dashboard sur les cours actifs (total cours/inscrits/désistements)."""
+    try:
+        row = (
+            await db.execute(
+                select(
+                    func.count(Course.id),
+                    func.coalesce(func.sum(Course.enrolled_count), 0),
+                    func.coalesce(func.sum(Course.dropout_count), 0),
+                ).where(Course.status == "active")
+            )
+        ).one()
+    except Exception as exc:
+        logger.error("Erreur DB get_totals : %s", exc)
+        raise
+    return {
+        "total_courses": int(row[0]),
+        "total_enrolled": int(row[1]),
+        "total_dropouts": int(row[2]),
+    }
 
 
 def compute_raw_score(enrolled: int, dropout: int) -> float:

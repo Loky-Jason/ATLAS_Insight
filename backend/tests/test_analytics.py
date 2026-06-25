@@ -77,10 +77,12 @@ async def test_popularity_top_flop(client):
     resp = await client.get("/api/v1/analytics/popularity?limit=5")
     assert resp.status_code == 200
     data = resp.json()
-    assert "top" in data
-    assert "flop" in data
+    assert "most_popular" in data
+    assert "least_popular" in data
+    assert {"total_courses", "total_enrolled", "total_dropouts"} <= data.keys()
     # Le top cours doit apparaître en premier
-    assert data["top"][0]["title"] == "Top cours"
+    assert data["most_popular"][0]["title"] == "Top cours"
+    assert data["total_courses"] == 2
 
 
 @pytest.mark.asyncio
@@ -96,5 +98,6 @@ async def test_popularity_empty_db(client):
     resp = await client.get("/api/v1/analytics/popularity")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["top"] == []
-    assert data["flop"] == []
+    assert data["most_popular"] == []
+    assert data["least_popular"] == []
+    assert data["total_courses"] == 0

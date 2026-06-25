@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
-from app.services.analytics_service import get_flop_courses, get_top_courses, refresh_all_scores
+from app.services.analytics_service import (
+    get_flop_courses,
+    get_top_courses,
+    get_totals,
+    refresh_all_scores,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +34,10 @@ async def get_popularity(
 
     Formule : score = inscrits − (désistements × 1.5), normalisé sur [0, 100].
     """
-    top = await get_top_courses(db, limit=limit)
-    flop = await get_flop_courses(db, limit=limit)
-    return {"top": top, "flop": flop}
+    most_popular = await get_top_courses(db, limit=limit)
+    least_popular = await get_flop_courses(db, limit=limit)
+    totals = await get_totals(db)
+    return {"most_popular": most_popular, "least_popular": least_popular, **totals}
 
 
 @router.post(

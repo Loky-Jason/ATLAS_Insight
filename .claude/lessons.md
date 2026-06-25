@@ -110,3 +110,15 @@ Finalisation review Phase 1 : cap `basis`, seuil similarité, code HTTP scan
 `_MAX_BASIS=5` (tri desc + slice sur les 3 chemins), seuil monté à 0.35, scan → 201 ; 3 tests asserts 200→201 mis à jour
 ### Règle
 Endpoint qui crée des ressources → 201. Toute liste renvoyée au front = bornée. Changer un code HTTP = MAJ les tests qui l'assertent dans la foulée.
+
+## 2026-06-25 — Bugs d'intégration front/back jamais testés en live
+### Contexte
+Premier lancement réel (uvicorn + vite + preview navigateur) pour montrer l'app
+### Problème
+2 bugs invisibles aux tests unitaires/build : (1) `api.ts` BASE_URL=`http://localhost:8000` sans préfixe `/api/v1` → tous les appels 404 ; (2) `/analytics/popularity` renvoyait `{top, flop}` mais le front attendait `{most_popular, least_popular, total_courses, total_enrolled, total_dropouts}` → crash StatCard/PopularityChart (page blanche, pas d'error boundary)
+### Cause
+Backend et frontend codés par sous-agents séparés, contrats jamais confrontés en exécution réelle (agents ont validé build/pytest, pas le runtime bout-en-bout)
+### Solution
+BASE_URL→`/api/v1` ; backend analytics aligné sur le contrat front (most_popular/least_popular + agrégats via `get_totals`) + tests MAJ. Vérifié en live : login + dashboard + CRUD OK
+### Règle
+Après un sprint front+back en parallèle, faire UN run d'intégration réel (serveurs lancés + parcours navigateur) avant de déclarer livré. Le build vert ≠ le runtime câblé. Ajouter à terme une error boundary React + des tests de contrat (schémas partagés).
