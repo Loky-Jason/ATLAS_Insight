@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   BookOpen,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { cn } from '@/lib/utils'
 
 // ── Navigation items ──────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
 export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogout = async () => {
     await logout()
@@ -108,9 +110,11 @@ export function AppShell() {
           </h1>
         </header>
 
-        {/* Contenu de la page */}
+        {/* Contenu de la page — ErrorBoundary reset à chaque navigation */}
         <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
