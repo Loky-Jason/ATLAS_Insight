@@ -6,7 +6,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-
 _RECOMMENDATION_TYPES = {"closure", "creation"}
 _STATUSES = {"draft", "approved", "rejected", "implemented"}
 

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from app.core.db import Base
+
+if TYPE_CHECKING:
+    from app.models.course import Course
+    from app.models.market_course import MarketCourse
 
 
 class GapRecommendation(Base):
@@ -23,6 +28,9 @@ class GapRecommendation(Base):
     market_course_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("market_courses.id", ondelete="SET NULL"), nullable=True
     )
+    # Clé d'identité des recommandations "creation" (titre représentatif normalisé)
+    # — assure l'idempotence de l'upsert quand scap/market_course_id sont None.
+    creation_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     score_breakdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     schools_offering: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -33,13 +41,13 @@ class GapRecommendation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        onupdate=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(UTC),
     )
 
-    scap_course: Mapped["Course | None"] = relationship(backref=backref("gap_recommendations", viewonly=True))
-    market_course: Mapped["MarketCourse | None"] = relationship(backref=backref("gap_recommendations", viewonly=True))
+    scap_course: Mapped[Course | None] = relationship(backref=backref("gap_recommendations", viewonly=True))
+    market_course: Mapped[MarketCourse | None] = relationship(backref=backref("gap_recommendations", viewonly=True))

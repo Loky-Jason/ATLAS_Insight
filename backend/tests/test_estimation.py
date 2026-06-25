@@ -7,7 +7,6 @@ import pytest
 from app.models.course import Course
 from app.services.estimation_service import _token_overlap, estimate_hours
 
-
 # ---------------------------------------------------------------------------
 # Unit — _token_overlap
 # ---------------------------------------------------------------------------

@@ -11,10 +11,10 @@ from __future__ import annotations
 import difflib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.db import AsyncSession
@@ -42,6 +42,19 @@ _SCORE_THRESHOLD = 40
 def _compute_similarity(a: str, b: str) -> float:
     """Similarité [0,1] entre deux chaînes (insensible à la casse)."""
     return difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def _as_utc(dt: datetime | None) -> datetime | None:
+    """Normalise un datetime en aware UTC.
+
+    SQLite/aiosqlite renvoie des datetimes naïfs, Postgres des aware : on
+    uniformise pour éviter `TypeError: can't compare naive and aware`.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _cluster_school_courses(
@@ -119,18 +132,32 @@ async def _upsert_recommendation(
     suggested_hours: float | None = None,
     certification_suggestions: str | None = None,
     rationale: str | None = None,
+    creation_key: str | None = None,
 ) -> GapRecommendation:
-    """Crée ou met à jour une recommandation existante."""
+    """Crée ou met à jour une recommandation existante.
+
+    Identité d'upsert : `scap_course_id` (closure) ou `creation_key`
+    (creation). Sans discriminant, on insère systématiquement (pas d'upsert)
+    pour éviter un `MultipleResultsFound` sur un filtre trop large.
+    """
     stmt = select(GapRecommendation).where(
         GapRecommendation.recommendation_type == rec_type,
     )
+    has_discriminator = False
     if scap_course_id is not None:
         stmt = stmt.where(GapRecommendation.scap_course_id == scap_course_id)
+        has_discriminator = True
     if market_course_id is not None:
         stmt = stmt.where(GapRecommendation.market_course_id == market_course_id)
+        has_discriminator = True
+    if creation_key is not None:
+        stmt = stmt.where(GapRecommendation.creation_key == creation_key)
+        has_discriminator = True
 
-    result = await db.execute(stmt)
-    existing = result.scalar_one_or_none()
+    existing = None
+    if has_discriminator:
+        result = await db.execute(stmt)
+        existing = result.scalar_one_or_none()
 
     if existing:
         existing.score = score
@@ -139,13 +166,14 @@ async def _upsert_recommendation(
         existing.suggested_hours = suggested_hours
         existing.certification_suggestions = certification_suggestions
         existing.rationale = rationale
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         db.add(existing)
     else:
         existing = GapRecommendation(
             recommendation_type=rec_type,
             scap_course_id=scap_course_id,
             market_course_id=market_course_id,
+            creation_key=creation_key,
             score=score,
             score_breakdown=score_breakdown,
             schools_offering=schools_offering,
@@ -180,7 +208,7 @@ async def _pass1_closure(db: AsyncSession) -> list[dict[str, Any]]:
     school_result = await db.execute(
         select(SchoolCourse)
         .options(selectinload(SchoolCourse.school_registry))
-        .where(SchoolCourse.is_removed == False)
+        .where(SchoolCourse.is_removed.is_(False))
     )
     all_school_courses: list[SchoolCourse] = list(school_result.scalars().all())
 
@@ -286,7 +314,7 @@ async def _pass2_creation(db: AsyncSession) -> list[dict[str, Any]]:
     school_result = await db.execute(
         select(SchoolCourse)
         .options(selectinload(SchoolCourse.school_registry))
-        .where(SchoolCourse.is_removed == False)
+        .where(SchoolCourse.is_removed.is_(False))
     )
     all_school_courses: list[SchoolCourse] = list(school_result.scalars().all())
 
@@ -326,7 +354,7 @@ async def _pass2_creation(db: AsyncSession) -> list[dict[str, Any]]:
     clusters = _cluster_school_courses(unmatched)
 
     created: list[dict[str, Any]] = []
-    now = datetime.now()
+    now = datetime.now(UTC)
     cutoff_30d = now - timedelta(days=30)
 
     for rep, school_names, schools_count in clusters:
@@ -370,7 +398,8 @@ async def _pass2_creation(db: AsyncSession) -> list[dict[str, Any]]:
         no_equiv_factor = 1.0 if max_scap_sim < _SIMILARITY_THRESHOLD else 0.0
 
         # recent_discovery (10%)
-        recent_factor = 1.0 if rep.first_seen_at and rep.first_seen_at >= cutoff_30d else 0.0
+        rep_seen = _as_utc(rep.first_seen_at)
+        recent_factor = 1.0 if rep_seen and rep_seen >= cutoff_30d else 0.0
 
         weighted = (
             schools_factor * 0.30
@@ -408,6 +437,7 @@ async def _pass2_creation(db: AsyncSession) -> list[dict[str, Any]]:
             rec_type="creation",
             scap_course_id=None,
             market_course_id=None,
+            creation_key=rep_title.strip().lower()[:255],
             score=round(weighted, 1),
             score_breakdown=json.dumps(breakdown, ensure_ascii=False),
             schools_offering=json.dumps(list(school_names), ensure_ascii=False),
@@ -467,7 +497,9 @@ async def get_creation_suggestions(db: AsyncSession) -> list[GapRecommendation]:
 # Actions sur recommandation
 # ---------------------------------------------------------------------------
 
-async def approve_recommendation(db: AsyncSession, rec_id: int) -> dict[str, Any]:
+async def approve_recommendation(
+    db: AsyncSession, rec_id: int, user_id: int | None = None
+) -> dict[str, Any]:
     """Approuve une recommandation et applique l'action correspondante.
 
     - closure   → archive le cours SCAP + AuditLog
@@ -518,11 +550,20 @@ async def approve_recommendation(db: AsyncSession, rec_id: int) -> dict[str, Any
                 db.add(course)
 
                 audit = AuditLog(
+                    user_id=user_id,
                     action="archive_course",
                     target=f"course:{course.id}:{course.title}",
                 )
                 db.add(audit)
                 action_taken = f"archived_course_{course.id}"
+
+    db.add(
+        AuditLog(
+            user_id=user_id,
+            action="approve_recommendation",
+            target=f"gap_recommendation:{rec.id}:{rec.recommendation_type}",
+        )
+    )
 
     await db.flush()
 

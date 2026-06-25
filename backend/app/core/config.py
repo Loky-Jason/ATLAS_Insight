@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     @model_validator(mode="after")
-    def _validate_secret_key(self) -> "Settings":
+    def _validate_secret_key(self) -> Settings:
         """Refuse une SECRET_KEY faible en production ; avertit hors prod."""
         key = self.secret_key
         is_weak = key in _WEAK_KEYS or len(key) < 32

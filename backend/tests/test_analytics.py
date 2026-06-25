@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models.course import Course
 from app.services.analytics_service import compute_raw_score
-
 
 # ---------------------------------------------------------------------------
 # Unit tests (no DB)

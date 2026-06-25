@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -26,9 +26,31 @@ logger = logging.getLogger(__name__)
 
 
 def _compute_hash(course: NormalisedCourse) -> str:
-    """SHA-256 du couple title|url pour détecter les modifications."""
-    raw = f"{course['title']}|{course.get('url', '') or ''}"
+    """SHA-256 des champs significatifs pour détecter les modifications.
+
+    Inclut titre, url, durée, prix, catégorie, format, certification et
+    description : une modification de l'un d'eux déclenche le chemin MODIFIED.
+    """
+    parts = [
+        course.get("title") or "",
+        course.get("url") or "",
+        str(course.get("duration_hours") or ""),
+        str(course.get("price") or ""),
+        course.get("category") or "",
+        course.get("format") or "",
+        course.get("certification") or "",
+        course.get("description") or "",
+    ]
+    raw = "|".join(parts)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _safe_close(scraper: Any) -> None:
+    """Ferme un scraper sans laisser une erreur I/O masquer le résultat du scan."""
+    try:
+        scraper.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Erreur fermeture scraper (ignorée) : %s", exc)
 
 
 def _course_to_dict(c: SchoolCourse) -> dict[str, Any]:
@@ -91,9 +113,9 @@ async def run_school_scan(
     except Exception as exc:
         scan_run.status = "error"
         scan_run.error_msg = str(exc)[:1024]
-        scan_run.finished_at = datetime.now(timezone.utc)
+        scan_run.finished_at = datetime.now(UTC)
         await db.flush()
-        scraper.close()
+        _safe_close(scraper)
         logger.error("Scan échoué school=%s: %s", school.name, exc)
         return {
             "school_name": school.name,
@@ -109,7 +131,7 @@ async def run_school_scan(
     result = await db.execute(
         select(SchoolCourse).where(
             SchoolCourse.school_registry_id == school.id,
-            SchoolCourse.is_removed == False,
+            SchoolCourse.is_removed.is_(False),
         )
     )
     existing_courses: list[SchoolCourse] = list(result.scalars().all())
@@ -117,14 +139,21 @@ async def run_school_scan(
         c.external_id: c for c in existing_courses
     }
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     seen_ids: set[str] = set()
     new_count = 0
     modified_count = 0
     unchanged_count = 0
 
+    skipped_count = 0
     for cd in raw_courses:
-        ext_id = cd["external_id"]
+        # Payload réseau non fiable : un cours sans clé requise est ignoré, pas fatal.
+        ext_id = cd.get("external_id")
+        title = cd.get("title")
+        if not ext_id or not title:
+            skipped_count += 1
+            logger.warning("Cours ignoré (external_id/title manquant) : %r", cd)
+            continue
         ch = _compute_hash(cd)
         seen_ids.add(ext_id)
 
@@ -136,7 +165,7 @@ async def run_school_scan(
                 SchoolCourse(
                     school_registry_id=school.id,
                     external_id=ext_id,
-                    title=cd["title"],
+                    title=title,
                     url=cd.get("url"),
                     description=cd.get("description"),
                     duration_hours=cd.get("duration_hours"),
@@ -152,7 +181,7 @@ async def run_school_scan(
             new_count += 1
         elif existing.content_hash != ch:
             # MODIFIED
-            existing.title = cd["title"]
+            existing.title = title
             existing.url = cd.get("url")
             existing.description = cd.get("description")
             existing.duration_hours = cd.get("duration_hours")
@@ -188,7 +217,7 @@ async def run_school_scan(
     school.last_scanned_at = now
 
     await db.flush()
-    scraper.close()
+    _safe_close(scraper)
 
     logger.info(
         "Scan terminé school=%s found=%d new=%d mod=%d removed=%d",
@@ -249,7 +278,7 @@ async def get_school_diff(
         .where(
             SchoolCourse.school_registry_id == sid,
             SchoolCourse.first_seen_at >= started,
-            SchoolCourse.is_removed == False,
+            SchoolCourse.is_removed.is_(False),
         )
         .order_by(SchoolCourse.first_seen_at.desc())
     )
@@ -259,7 +288,7 @@ async def get_school_diff(
         .where(
             SchoolCourse.school_registry_id == sid,
             SchoolCourse.last_updated_at >= started,
-            SchoolCourse.is_removed == False,
+            SchoolCourse.is_removed.is_(False),
         )
         .order_by(SchoolCourse.last_updated_at.desc())
     )
@@ -269,7 +298,7 @@ async def get_school_diff(
         .where(
             SchoolCourse.school_registry_id == sid,
             SchoolCourse.removed_at >= started,
-            SchoolCourse.is_removed == True,
+            SchoolCourse.is_removed.is_(True),
         )
         .order_by(SchoolCourse.removed_at.desc())
     )
@@ -288,7 +317,12 @@ async def get_school_diff(
             "courses_new": scan_run.courses_new,
             "courses_modified": scan_run.courses_modified,
             "courses_removed": scan_run.courses_removed,
-            "error_msg": scan_run.error_msg,
+            # Détail interne (chemins/URL) gardé dans les logs serveur, pas exposé.
+            "error_msg": (
+                "Le scan a échoué (voir les logs serveur)."
+                if scan_run.status == "error"
+                else None
+            ),
         },
         "new_courses": [_course_to_dict(c) for c in new_q.scalars().all()],
         "modified_courses": [_course_to_dict(c) for c in mod_q.scalars().all()],
@@ -313,7 +347,7 @@ async def get_dashboard_counts(db: AsyncSession) -> dict[str, int]:
     try:
         total = await db.execute(
             select(func.count(SchoolRegistry.id)).where(
-                SchoolRegistry.active == True
+                SchoolRegistry.active.is_(True)
             )
         )
         total_schools: int = total.scalar() or 0

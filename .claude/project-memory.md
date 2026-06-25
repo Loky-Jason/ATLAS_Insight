@@ -1,5 +1,12 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-06-26 — Phase 1b + 1c complètes. Backend 133/133, frontend build OK. Dernier commit `ae9a60a` (master, GitHub Loky-Jason/ATLAS_Insight).
+**Last:** 2026-06-26 — Revue Phase 1b/1c : 10 points corrigés. **Backend 136/136** (+3 tests gap régression), build front vert, ruff clean (reste 17 E501 cosmétiques).
+
+## Durcissement revue Phase 1b/1c (2026-06-26)
+- **B1** `gap_service` : recommandations "creation" s'écrasaient toutes en 1 ligne (filtre upsert trop large) → colonne `creation_key` + insertion sans discriminant. Régression `tests/test_gap_service.py`.
+- **B2** `gap_service` : datetime naïf/aware → helper `_as_utc` (aware UTC des 2 côtés, safe SQLite+Postgres). Corrige la "solution" naïve d'OpenCode (cassait à la migration Postgres).
+- I/O scrapers : try/except `httpx.HTTPError`→`RuntimeError`, borne `MAX_PAGES=200`, `_safe_close`.
+- Sécu : `app/core/url_safety.py` (anti-SSRF, `field_validator` schéma school) ; AuditLog sur create/update/scan school + gap analyze/approve ; `error_msg` générique `/diff`.
+- `_compute_hash` étendu (durée/prix/desc/catégorie/format/certif). Lint : forward-refs models `TYPE_CHECKING`, `== True/False`→`.is_()`.
 
 ## État pour reprise (OpenCode)
 - **Phase 0** ✅, **Phase 1a** ✅, **Phase 1b** ✅ (multi-school scraper engine : SchoolRegistry, SchoolCourse, MarketScanRun ; SCAP + Stub adapters ; ScannerService + diff hash-based ; endpoints schools CRUD/scan/diff/counts), **Phase 1c** ✅ (gap analysis engine : GapRecommendation model, ClosureScorer + CreationScorer 5 facteurs, endpoints analyze/candidates/suggestions/approve/list). **Phase UX** 📝 (planifiée, non démarrée).

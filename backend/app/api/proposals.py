@@ -13,7 +13,11 @@ from app.core.security import get_current_user, require_admin
 from app.models.audit_log import AuditLog
 from app.models.course_proposal import CourseProposal
 from app.models.user import User
-from app.schemas.course_proposal import CourseProposalCreate, CourseProposalRead, CourseProposalUpdate
+from app.schemas.course_proposal import (
+    CourseProposalCreate,
+    CourseProposalRead,
+    CourseProposalUpdate,
+)
 
 logger = logging.getLogger(__name__)
 

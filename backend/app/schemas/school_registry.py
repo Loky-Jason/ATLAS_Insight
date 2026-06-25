@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.url_safety import validate_external_url
 
 
 class SchoolRegistryCreate(BaseModel):
@@ -14,6 +16,11 @@ class SchoolRegistryCreate(BaseModel):
     active: bool = True
     scan_interval: int = Field(default=1440, ge=1)
 
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, v: str) -> str:
+        return validate_external_url(v)
+
 
 class SchoolRegistryUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -21,6 +28,11 @@ class SchoolRegistryUpdate(BaseModel):
     scraper_strategy: str | None = Field(default=None, max_length=50)
     active: bool | None = None
     scan_interval: int | None = Field(default=None, ge=1)
+
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, v: str | None) -> str | None:
+        return validate_external_url(v) if v is not None else v
 
 
 class SchoolRegistryRead(BaseModel):

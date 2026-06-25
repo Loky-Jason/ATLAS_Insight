@@ -82,6 +82,7 @@ async def create_school(
     except Exception as exc:
         logger.error("Erreur DB create_school : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur lors de la création.")
+    await _write_audit(db, current_user.id, f"create_school:{school.id}", school.name)
     logger.info("École créée %s (id=%s) par user %s.", school.name, school.id, current_user.id)
     return school
 
@@ -114,6 +115,7 @@ async def update_school(
     except Exception as exc:
         logger.error("Erreur DB update_school %s : %s", school_id, exc)
         raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour.")
+    await _write_audit(db, current_user.id, f"update_school:{school.id}", school.name)
     logger.info("École %s mise à jour par user %s.", school_id, current_user.id)
     return school
 
@@ -144,7 +146,8 @@ async def trigger_scan(
     current_user: User = Depends(require_admin),
 ) -> dict[str, Any]:
     """Déclencher un scan pour une école (admin)."""
-    await _get_school_or_404(school_id, db)
+    school = await _get_school_or_404(school_id, db)
+    await _write_audit(db, current_user.id, f"scan_school:{school_id}", school.name)
     try:
         summary = await scanner_service.run_school_scan(db, school_id, current_user.id)
     except Exception as exc:

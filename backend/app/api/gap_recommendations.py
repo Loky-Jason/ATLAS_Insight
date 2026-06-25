@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.security import get_current_user, require_admin
+from app.models.audit_log import AuditLog
 from app.models.gap_recommendation import GapRecommendation
 from app.models.user import User
 from app.schemas.gap_recommendation import GapRecommendationList, GapRecommendationRead
@@ -85,6 +86,14 @@ async def trigger_analysis(
     """Déclencher une analyse complète des écarts (admin)."""
     try:
         summary = await gap_service.run_gap_analysis(db, current_user.id)
+        db.add(
+            AuditLog(
+                user_id=current_user.id,
+                action="run_gap_analysis",
+                target="gap_recommendations",
+            )
+        )
+        await db.flush()
     except Exception as exc:
         logger.error("Erreur gap analysis : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur lors de l'analyse.")
@@ -95,11 +104,11 @@ async def trigger_analysis(
 async def approve_recommendation(
     rec_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> dict[str, Any]:
     """Approuver une recommandation (admin)."""
     try:
-        result = await gap_service.approve_recommendation(db, rec_id)
+        result = await gap_service.approve_recommendation(db, rec_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:

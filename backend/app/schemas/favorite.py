@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Self
 
 from pydantic import BaseModel, model_validator
-from typing import Self
 
 
 class FavoriteCreate(BaseModel):

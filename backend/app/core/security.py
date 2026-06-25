@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Annotated
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,7 @@ def needs_rehash(hashed: str) -> bool:
 
 def create_access_token(user_id: int, role: str) -> str:
     """Create a signed JWT containing *user_id* and *role*."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     expire = now + timedelta(seconds=settings.jwt_expire_seconds)
     payload: dict = {
         "sub": str(user_id),
@@ -111,7 +114,7 @@ def decode_access_token(token: str) -> dict:
 async def get_current_user(
     access_token: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None,
     db: AsyncSession = Depends(get_db),
-) -> "User":  # type: ignore[name-defined]  # forward ref
+) -> User:  # type: ignore[name-defined]  # forward ref
     """
     Dependency that resolves the authenticated user from the httpOnly JWT cookie.
     Raises 401 if missing/invalid, 404 if user no longer exists.

@@ -181,6 +181,7 @@ def test_normal_string_not_prefixed():
 async def test_import_audit_log_written(client, db_session):
     """Un AuditLog doit être créé après un import réussi (M1)."""
     from sqlalchemy import select
+
     from app.models.audit_log import AuditLog
 
     await _register_and_login(client)
@@ -207,6 +208,7 @@ async def test_import_audit_log_written(client, db_session):
 def test_secret_key_weak_rejected_in_production():
     """Une SECRET_KEY faible doit lever ValueError en environnement production (C1)."""
     from pydantic import ValidationError
+
     from app.core.config import Settings
 
     with pytest.raises((ValueError, ValidationError)):
@@ -216,6 +218,7 @@ def test_secret_key_weak_rejected_in_production():
 def test_secret_key_short_rejected_in_production():
     """Une SECRET_KEY < 32 caractères doit lever ValueError en production (C1)."""
     from pydantic import ValidationError
+
     from app.core.config import Settings
 
     with pytest.raises((ValueError, ValidationError)):

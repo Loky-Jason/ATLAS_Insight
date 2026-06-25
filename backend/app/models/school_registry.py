@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+
+if TYPE_CHECKING:
+    from app.models.market_course import MarketCourse
+    from app.models.market_scan_run import MarketScanRun
+    from app.models.school_course import SchoolCourse
 
 
 class SchoolRegistry(Base):
@@ -25,13 +31,13 @@ class SchoolRegistry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
-    school_courses: Mapped[list["SchoolCourse"]] = relationship(
+    school_courses: Mapped[list[SchoolCourse]] = relationship(
         back_populates="school_registry", cascade="all, delete-orphan"
     )
-    scan_runs: Mapped[list["MarketScanRun"]] = relationship(
+    scan_runs: Mapped[list[MarketScanRun]] = relationship(
         back_populates="school_registry", cascade="all, delete-orphan"
     )
-    market_courses: Mapped[list["MarketCourse"]] = relationship(back_populates="school_registry")
+    market_courses: Mapped[list[MarketCourse]] = relationship(back_populates="school_registry")

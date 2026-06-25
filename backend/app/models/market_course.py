@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+
+if TYPE_CHECKING:
+    from app.models.school_registry import SchoolRegistry
 
 
 class MarketCourse(Base):
@@ -31,7 +35,7 @@ class MarketCourse(Base):
     discovered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
-    school_registry: Mapped["SchoolRegistry | None"] = relationship(back_populates="market_courses")
+    school_registry: Mapped[SchoolRegistry | None] = relationship(back_populates="market_courses")

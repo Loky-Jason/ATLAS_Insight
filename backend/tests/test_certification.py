@@ -6,7 +6,6 @@ import pytest
 
 from app.services.certification_service import suggest_certifications
 
-
 # ---------------------------------------------------------------------------
 # Unit — suggest_certifications
 # ---------------------------------------------------------------------------

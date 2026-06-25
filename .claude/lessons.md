@@ -161,9 +161,31 @@ SQLite stocke les datetimes sans timezone (offset-naive), datetime.now(timezone.
 ### Cause
 Ligne #330 de gap_service.py utilisait `datetime.now(timezone.utc)` par habitude d'UTC, sans réaliser que SQLAlchemy/SQLite renvoie des naives.
 ### Solution
-Remplacé par `datetime.now()` (naive) — cohérent avec le format SQLite. La pass1 closure n'était pas touchée car elle ne fait pas de comparaison temporelle.
+~~Remplacé par `datetime.now()` (naive)~~ **CORRIGÉ 2026-06-26 (revue Phase 1b/1c) :** le naïf casse à la migration Postgres prévue (Postgres renvoie aware → re-TypeError). Solution robuste = normaliser **les deux côtés** en aware UTC avant comparaison via helper `_as_utc(dt)` (`dt.replace(tzinfo=UTC)` si naïf, sinon `astimezone(UTC)`). `now = datetime.now(UTC)`.
 ### Règle
-Dans un projet SQLite (pas de timezone en base), utiliser `datetime.now()` sans timezone pour toutes les comparaisons temporelles internes. Ne mélanger naive et aware que si la base stocke explicitement des timezone.
+Ne jamais comparer des datetimes dont l'awareness dépend du backend DB. Normaliser systématiquement en aware UTC au point de comparaison (helper `_as_utc`). Vaut pour SQLite (naïf) ET Postgres (aware) — indispensable vu la migration M365/Postgres au programme.
+
+## 2026-06-26 — Revue Phase 1b/1c (scrapers + gap engine) : bugs non couverts par les tests
+### Contexte
+Revue (code-reviewer + security-auditor en sous-agents) du code OpenCode Phase 1b/1c. 133 tests verts + build vert, mais Phase 1c (gap_service, 534 lignes) avait **0 test** → bugs logiques/sécu latents.
+### Problème
+1. **Upsert "creation" s'écrasait en 1 ligne** : `_upsert_recommendation` filtrait seulement `type=="creation"` (scap/market_course_id None) → chaque cluster, via flush+select, écrasait la ligne du précédent. N opportunités → 1 ligne. 2 lignes coexistantes → `MultipleResultsFound`.
+2. I/O réseau scrapers sans try/except (viole règle projet) ; pagination `while True` non bornée ; `scraper.close()` hors garde.
+3. SSRF latent : `url` école = `str` libre, pas de garde http/https/IP interne.
+4. AuditLog absent sur 4 mutations admin (create/update/scan school, gap analyze/approve).
+5. `error_msg` httpx brut exposé à tout user via `/diff`.
+6. Hash de changement sur `title|url` seul → modif prix/durée/desc jamais détectée.
+### Cause
+Feature livrée sans suite de tests dédiée ; tests existants ne couvraient pas le service gap ni les chemins d'erreur réseau.
+### Solution
+1. Colonne `creation_key` (titre représentatif normalisé) comme clé d'identité d'upsert ; insertion directe si aucun discriminant. + 3 tests régression `test_gap_service.py`.
+2. try/except `httpx.HTTPError`→`RuntimeError` ; borne `MAX_PAGES=200` (`while/else`) ; helper `_safe_close`.
+3. Helper `app/core/url_safety.py::validate_external_url` (schéma http/https, blocage loopback/privé/link-local/metadata) branché en `field_validator` sur le schéma school.
+4. `_write_audit` ajouté aux 4 mutations ; `approve_recommendation(user_id)` + AuditLog.
+5. `error_msg` générique côté API, détail gardé dans logs serveur.
+6. `_compute_hash` couvre titre+url+durée+prix+catégorie+format+certif+description.
+### Règle
+Toute feature métier ⇒ suite de tests dédiée AVANT merge (surtout services purs logique, invisibles aux tests d'API). Tout I/O réseau ⇒ try/except + borne d'itération. Toute URL externe fournie par l'utilisateur ⇒ valider anti-SSRF au schéma. Toute mutation admin ⇒ AuditLog dans la même transaction. Clé d'upsert ⇒ discriminant explicite, jamais `scalar_one_or_none()` sur un filtre large.
 
 ## 2026-06-26 — transition-all sur UI boutons/nav/cards (PC Mairie)
 ### Contexte

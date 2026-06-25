@@ -167,6 +167,7 @@ class WebMarketProvider(MarketSearchProvider):
     """
 
     SEARCH_URL = "https://scap.paris.fr/Search/Elements"
+    MAX_PAGES = 200
 
     def __init__(self, client: httpx.Client | None = None) -> None:
         self._http = client or httpx.Client()
@@ -177,7 +178,7 @@ class WebMarketProvider(MarketSearchProvider):
         results: list[RawMarketResult] = []
         page = 0
 
-        while True:
+        while page < self.MAX_PAGES:
             html_text = self._fetch_page(page, query)
             courses = self._parse_page(html_text)
             if not courses:
@@ -186,6 +187,10 @@ class WebMarketProvider(MarketSearchProvider):
             if not self._has_next(html_text):
                 break
             page += 1
+        else:
+            logger.warning(
+                "WebMarketProvider — borne MAX_PAGES=%d atteinte, arrêt.", self.MAX_PAGES
+            )
 
         logger.info("WebMarketProvider — %d cours extraits du catalogue SCAP.", len(results))
         return results
@@ -194,8 +199,12 @@ class WebMarketProvider(MarketSearchProvider):
         payload = dict(_SEARCH_FIELDS)
         payload["PageIndex"] = page
         payload["Keywords"] = query
-        resp = self._http.post(self.SEARCH_URL, data=payload, timeout=30)
-        resp.raise_for_status()
+        try:
+            resp = self._http.post(self.SEARCH_URL, data=payload, timeout=30)
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.error("WebMarketProvider._fetch_page p=%d — erreur réseau : %s", page, exc)
+            raise RuntimeError(f"Échec récupération page {page} du catalogue SCAP.") from exc
         return resp.text
 
     def _parse_page(self, html_text: str) -> list[RawMarketResult]:

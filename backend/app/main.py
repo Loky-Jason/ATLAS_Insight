@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.core.config import settings
-from app.core.db import init_db
 
 # Routers
 from app.api.analytics import router as analytics_router
@@ -18,17 +15,19 @@ from app.api.audit_logs import router as audit_logs_router
 from app.api.auth import router as auth_router
 from app.api.certification import router as certification_router
 from app.api.courses import router as courses_router
+from app.api.dashboard import router as dashboard_router
 from app.api.estimate import router as estimate_router
 from app.api.favorites import router as favorites_router
+from app.api.gap_recommendations import router as gap_recommendations_router
 from app.api.imports import router as imports_router
 from app.api.market import router as market_router
 from app.api.market_courses import router as market_courses_router
 from app.api.proposals import router as proposals_router
-from app.api.schools import router as schools_router
-from app.api.school_courses import router as school_courses_router
 from app.api.scan_runs import router as scan_runs_router
-from app.api.dashboard import router as dashboard_router
-from app.api.gap_recommendations import router as gap_recommendations_router
+from app.api.school_courses import router as school_courses_router
+from app.api.schools import router as schools_router
+from app.core.config import settings
+from app.core.db import init_db
 
 logging.basicConfig(
     level=logging.INFO,

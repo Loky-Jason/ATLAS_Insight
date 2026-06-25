@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import (
-    COOKIE_NAME,
     _DUMMY_HASH,
+    COOKIE_NAME,
     create_access_token,
     get_current_user,
     hash_password,
