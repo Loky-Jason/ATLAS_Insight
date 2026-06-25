@@ -26,13 +26,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon: Icon, className }: StatCardProps) {
   return (
-    <Card className={cn('', className)}>
-      <CardContent className="flex items-center gap-4 p-6">
-        <div className="rounded-lg bg-primary/10 p-3">
+    <Card className={cn('group relative overflow-hidden transition duration-[var(--duration-normal)] ease-[var(--ease-out)] hover:-translate-y-0.5', className)}>
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent" aria-hidden="true" />
+      <CardContent className="relative flex items-center gap-4 p-6">
+        <div className="rounded-lg bg-primary/10 p-3 transition-colors group-hover:bg-primary/15">
           <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
         </div>
         <div>
-          <p className="text-2xl font-bold">{value.toLocaleString('fr-FR')}</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums">{value.toLocaleString('fr-FR')}</p>
           <p className="text-sm text-muted-foreground">{label}</p>
         </div>
       </CardContent>

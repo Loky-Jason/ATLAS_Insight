@@ -66,7 +66,7 @@ function PopularityBar({ score }: { score: number }) {
     <div className="flex items-center gap-2">
       <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full transition-all"
+          className="h-full rounded-full transition-[width,background-color] duration-[var(--duration-normal)]"
           style={{
             width: `${score}%`,
             backgroundColor: `hsl(${hue}, 70%, 45%)`,
