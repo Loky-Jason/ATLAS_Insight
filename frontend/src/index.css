@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    /* Dark theme tokens — thème sombre par défaut */
+    /* Dark theme tokens — Data-Dense Dashboard (ui-ux-pro-max) */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222.2 47% 7.5%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222.2 47% 7.5%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 217.2 91.2% 59.8%;
@@ -20,7 +20,7 @@
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 217.2 32.6% 14%;
     --muted-foreground: 215 20.2% 65.1%;
 
     --accent: 217.2 32.6% 17.5%;
@@ -31,9 +31,16 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 217.2 91.2% 59.8%;
 
     --radius: 0.5rem;
+
+    /* Animation tokens — emil-design-eng */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 300ms;
   }
 }
 
@@ -43,6 +50,47 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Fira Sans', system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  code, pre, .tabular-nums {
+    font-family: 'Fira Code', monospace;
+  }
+}
+
+@layer utilities {
+  /* Stagger fade-in pour listes / table rows */
+  .stagger-enter {
+    opacity: 0;
+    transform: translateY(6px);
+    animation: fadeSlideIn var(--duration-slow) var(--ease-out) forwards;
+  }
+  .stagger-enter:nth-child(1) { animation-delay: 0ms; }
+  .stagger-enter:nth-child(2) { animation-delay: 30ms; }
+  .stagger-enter:nth-child(3) { animation-delay: 60ms; }
+  .stagger-enter:nth-child(4) { animation-delay: 90ms; }
+  .stagger-enter:nth-child(5) { animation-delay: 120ms; }
+  .stagger-enter:nth-child(6) { animation-delay: 150ms; }
+  .stagger-enter:nth-child(7) { animation-delay: 180ms; }
+  .stagger-enter:nth-child(8) { animation-delay: 210ms; }
+
+  @keyframes fadeSlideIn {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stagger-enter {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

@@ -10,6 +10,7 @@ import { api, ApiError, type CourseProposal } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -141,9 +142,9 @@ function ProposalModal({
           </div>
           <div className="space-y-2">
             <Label htmlFor="prop-description">Description</Label>
-            <textarea
+            <Textarea
               id="prop-description"
-              className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="min-h-[100px]"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
@@ -173,7 +174,7 @@ function ProposalModal({
                 onChange={(e) =>
                   setForm({ ...form, status: e.target.value as CourseProposal['status'] })
                 }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="draft">Brouillon</option>
                 <option value="proposed">Proposé</option>
@@ -183,9 +184,8 @@ function ProposalModal({
           </div>
           <div className="space-y-2">
             <Label htmlFor="prop-cert">Pistes certification</Label>
-            <textarea
+            <Textarea
               id="prop-cert"
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={form.certification_suggestions}
               onChange={(e) =>
                 setForm({ ...form, certification_suggestions: e.target.value })
@@ -342,7 +342,7 @@ export function ProposalsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Tous les statuts</option>
               <option value="draft">Brouillon</option>
