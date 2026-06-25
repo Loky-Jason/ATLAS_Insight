@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -204,18 +205,16 @@ function MarketCourseModal({
           </div>
           <div className="space-y-2">
             <Label htmlFor="mw-summary">Résumé</Label>
-            <textarea
+            <Textarea
               id="mw-summary"
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={form.summary}
               onChange={(e) => setForm({ ...form, summary: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="mw-why">Pourquoi ça marche</Label>
-            <textarea
+            <Textarea
               id="mw-why"
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={form.why_it_works}
               onChange={(e) => setForm({ ...form, why_it_works: e.target.value })}
             />
@@ -228,7 +227,7 @@ function MarketCourseModal({
               onChange={(e) =>
                 setForm({ ...form, status: e.target.value as MarketCourse['status'] })
               }
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="candidate">Candidat</option>
               <option value="reviewed">Examiné</option>
