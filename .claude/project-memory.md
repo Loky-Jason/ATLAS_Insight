@@ -1,8 +1,8 @@
 ﻿# Memory — ATLAS_Insight
-**Last:** 2026-06-25 — Phase 1 livrée + **vérifiée en live** (login+dashboard+CRUD). Backend 121/121, frontend build vert. Dernier commit `be01eb0` (master, poussé GitHub Loky-Jason/ATLAS_Insight).
+**Last:** 2026-06-25 — Phase 1b livrée + review corrections (requests→httpx, close(), query forward). Backend 133/133, frontend build vert. Dernier commit `0413f34` (master, GitHub Loky-Jason/ATLAS_Insight).
 
 ## État pour reprise (OpenCode)
-- Phase 0 + Phase 1 fonctionnelles et poussées. Reste Phase 1 : (1) **provider veille web RÉEL** (`market_service.get_market_provider()`, aujourd'hui StubProvider) ; (2) **passe design** ui-ux-pro-max → emil-design-eng → impeccable (UI encore brute, thème dark neutre).
+- Phase 0 + Phase 1 complètes et push. Phase 1b (WebMarketProvider) livré avec corrections review appliquées.
 - Lancer en local : backend `cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000` (copier `.env.example`→`.env`, générer SECRET_KEY `python -c "import secrets;print(secrets.token_hex(32))"`) ; frontend `cd frontend && npm run dev` (port 5173). Compte démo seedé possible via API : admin (1er compte = admin).
 - Règle process : après chaque sprint front+back, faire un **run d'intégration réel** (serveurs lancés + parcours navigateur) — les sous-agents valident build/pytest, pas le runtime câblé.
 
@@ -43,3 +43,6 @@
 | Cross-champ → `model_validator(mode="after")` | Phase 1 | field_validator ne voit pas les autres champs en Pydantic v2 |
 | `response_model` obligatoire sur endpoints consommés par le front | Phase 1 | Verrou de contrat — un drift `{top,flop}`→`{most_popular,…}` avait crashé le dashboard |
 | ErrorBoundary autour des pages | Phase 1 | Une erreur de rendu = page blanche sinon |
+| `httpx` plutôt que `requests` | Phase 1b | httpx déjà en dev-deps, support sync+async natif, évite doublon de lib HTTP |
+| `close()` sur MarketSearchProvider | Phase 1b | Ressource leak potentiel de la session HTTP sur scans longs (33 pages) |
+| `query` forwardé à l'API SCAP | Phase 1b | Paramètre ignoré = code mort ; le mappage sur Keywords filtre les résultats côté API |

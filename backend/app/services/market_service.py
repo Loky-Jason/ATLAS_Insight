@@ -1,30 +1,20 @@
-"""Service de veille marché — abstraction provider + scoring + persistance.
-
-Architecture :
-  MarketSearchProvider (ABC) — interface à implémenter pour tout provider réel.
-  StubMarketProvider          — données déterministes (tests / démo).
-
-POINT D'INTÉGRATION RÉEL :
-  Pour brancher un vrai provider (ex. WebSearch via Bing/DuckDuckGo, ou un LLM
-  qui retourne des formations marché en JSON) :
-    1. Créer une classe héritant de MarketSearchProvider.
-    2. Implémenter la méthode `search(query) -> list[RawMarketResult]`.
-    3. Dans app/core/config.py, ajouter un paramètre MARKET_PROVIDER
-       (valeurs : "stub" | "web" | "llm").
-    4. Modifier get_market_provider() ci-dessous pour instancier le bon provider.
-  Le reste du pipeline (scoring, déduplication, persistance) est inchangé.
-"""
+"""Service de veille marché — abstraction provider + scoring + persistance."""
 
 from __future__ import annotations
 
+import asyncio
+import html as html_mod
 import logging
+import re
 from abc import ABC, abstractmethod
 from difflib import SequenceMatcher
 from typing import Any, TypedDict
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.course import Course
 from app.models.market_course import MarketCourse
 
@@ -64,6 +54,10 @@ class MarketSearchProvider(ABC):
         -------
         list[RawMarketResult] — résultats bruts, non scorés.
         """
+
+    @abstractmethod
+    def close(self) -> None:
+        """Libère les ressources (session HTTP, etc.). Appelé après usage."""
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +134,117 @@ class StubMarketProvider(MarketSearchProvider):
         logger.info("StubMarketProvider.search() — retourne %d résultats fictifs.", len(_STUB_DATA))
         return list(_STUB_DATA)
 
+    def close(self) -> None:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Implémentation Web (scraping catalogue SCAP en ligne)
+# ---------------------------------------------------------------------------
+
+_SEARCH_FIELDS: dict[str, Any] = {
+    "DomainsIds": [],
+    "Keywords": "",
+    "PeriodicityIds": [],
+    "CourseTypeIds": [],
+    "District": "",
+    "InstitutionId": "",
+    "Disponibilities": [],
+    "TimeSlots": [],
+    "OnlyOpened": "false",
+    "PageIndex": 0,
+    "RegistrationStart": "",
+    "RegistrationEnd": "",
+}
+
+
+class WebMarketProvider(MarketSearchProvider):
+    """
+    Provider réel qui scrape le catalogue SCAP via son endpoint /Search/Elements.
+
+    Itère sur toutes les pages, extrait titre / durée / prix / objectif,
+    et retourne les résultats au format RawMarketResult.
+    """
+
+    SEARCH_URL = "https://scap.paris.fr/Search/Elements"
+
+    def __init__(self, client: httpx.Client | None = None) -> None:
+        self._http = client or httpx.Client()
+        self._http.headers.update({"User-Agent": "ATLAS-Insight/1.0"})
+
+    def search(self, query: str) -> list[RawMarketResult]:
+        logger.info("WebMarketProvider.search() — scraping catalogue SCAP...")
+        results: list[RawMarketResult] = []
+        page = 0
+
+        while True:
+            html_text = self._fetch_page(page, query)
+            courses = self._parse_page(html_text)
+            if not courses:
+                break
+            results.extend(courses)
+            if not self._has_next(html_text):
+                break
+            page += 1
+
+        logger.info("WebMarketProvider — %d cours extraits du catalogue SCAP.", len(results))
+        return results
+
+    def _fetch_page(self, page: int, query: str = "") -> str:
+        payload = dict(_SEARCH_FIELDS)
+        payload["PageIndex"] = page
+        payload["Keywords"] = query
+        resp = self._http.post(self.SEARCH_URL, data=payload, timeout=30)
+        resp.raise_for_status()
+        return resp.text
+
+    def _parse_page(self, html_text: str) -> list[RawMarketResult]:
+        blocks = re.findall(
+            r'accordionElement(\d+)[^>]*>.*?<h4>(.*?)</h4>\s*<p>(.*?)</p>.*?<h5>Objectif\s*:</h5>\s*<p>(.*?)</p>',
+            html_text,
+            re.DOTALL,
+        )
+        if not blocks and re.search(
+            r'<h3>\s*\d+\s*r[eé]sultats?\s*</h3>', html_text, re.IGNORECASE
+        ):
+            logger.warning(
+                "WebMarketProvider._parse_page — page avec résultats annoncés "
+                "mais aucun cours parsé (template SCAP peut-être modifié)."
+            )
+        results: list[RawMarketResult] = []
+        for course_id, title, detail, objective in blocks:
+            title = html_mod.unescape(title.strip())
+            objective = html_mod.unescape(re.sub(r"&#xD;&#xA;", "\n", objective.strip()))
+            detail = html_mod.unescape(detail.strip())
+            results.append(
+                {
+                    "title": title,
+                    "school": "SCAP / Cours d'Adultes de Paris",
+                    "source_url": f"https://scap.paris.fr/Element/Details/{course_id}",
+                    "summary": objective,
+                    "category": None,
+                }
+            )
+        return results
+
+    @staticmethod
+    def _has_next(html_text: str) -> bool:
+        pages = re.findall(r'changePage\(\s*(\d+)\s*\)', html_text)
+        if not pages:
+            return False
+        max_page = max(int(p) for p in pages)
+        current = re.search(
+            r'page-item\s+active[^>]*>.*?changePage\(\s*(\d+)\s*\)',
+            html_text,
+            re.DOTALL,
+        )
+        if not current:
+            return False
+        return int(current.group(1)) < max_page
+
+    def close(self) -> None:
+        self._http.close()
+
 
 # ---------------------------------------------------------------------------
 # Factory provider
@@ -147,12 +252,17 @@ class StubMarketProvider(MarketSearchProvider):
 
 def get_market_provider() -> MarketSearchProvider:
     """
-    Retourne le provider configuré.
+    Retourne le provider configuré via settings.market_provider.
 
-    POINT D'EXTENSION : lire ici la config (ex. settings.market_provider)
-    pour instancier le bon provider (WebSearchProvider, LLMProvider…).
-    Actuellement, seul StubMarketProvider est disponible.
+    Valeurs supportées :
+      - "stub" (défaut) → StubMarketProvider (données déterministes)
+      - "web"           → WebMarketProvider (scraping catalogue SCAP en ligne)
     """
+    provider_name = settings.market_provider
+    if provider_name == "web":
+        logger.info("get_market_provider() → WebMarketProvider")
+        return WebMarketProvider()
+    logger.info("get_market_provider() → StubMarketProvider (défaut)")
     return StubMarketProvider()
 
 
@@ -225,7 +335,7 @@ async def run_market_scan(
     provider = get_market_provider()
 
     try:
-        raw_results = provider.search(query)
+        raw_results = await asyncio.to_thread(provider.search, query)
     except Exception as exc:
         logger.error("Erreur provider veille marché : %s", exc)
         raise

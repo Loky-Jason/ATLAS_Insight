@@ -1,5 +1,5 @@
 ﻿# Lessons — ATLAS_Insight
-**Updated:** 2026-06-24 — session 2
+**Updated:** 2026-06-25 — session 3
 
 ## Format
 Chaque entrée suit le template :
@@ -132,3 +132,13 @@ Sans `response_model`, la forme de la réponse peut dériver sans alerte (cause 
 Schéma Pydantic `AnalyticsPopularity`/`PopularityEntry` + `response_model` sur `/analytics/popularity` ; `.env.example` corrigé vers `/api/v1`
 ### Règle
 Tout endpoint consommé par le front DOIT avoir un `response_model` Pydantic (verrou de contrat + OpenAPI). Les `.env.example` doivent contenir une valeur fonctionnelle telle quelle.
+
+## 2026-06-25 — Review subagent : 3 corrections post-livraison WebMarketProvider
+### Contexte
+Sub-agent `review-changes` a audité les modifs Phase 1b (WebMarketProvider). A remonté 5 issues dont 3 mineures skippées puis re-corrigées sur demande.
+### Problème
+(1) `requests` ajouté comme dep alors que `httpx` déjà en dev-deps ; (2) `query` param marqué `# noqa: ARG002` jamais forwardé à l'API SCAP ; (3) Session HTTP jamais close (ressource leak mineur)
+### Solution
+(1) `requests`→`httpx` (promu en dep principale) ; (2) `query` passé comme `Keywords` dans le payload SCAP via `_fetch_page(page, query)` ; (3) `close()` abstrait dans ABC + implémenté Stub (pass) / Web (`self._http.close()`)
+### Règle
+Un sub-agent de review peut skipper des issues pour trade-off explicables, MAIS toujours demander confirmation avant de les laisser non corrigées. Parfois le skip est juste de la paresse.

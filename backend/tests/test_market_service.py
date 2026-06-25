@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from sqlalchemy import select
 
@@ -10,10 +12,11 @@ from app.models.course import Course
 from app.models.market_course import MarketCourse
 from app.services.market_service import (
     StubMarketProvider,
+    WebMarketProvider,
     _compute_relevance,
+    get_market_provider,
     run_market_scan,
 )
-
 
 # ---------------------------------------------------------------------------
 # Unit — StubMarketProvider
@@ -42,6 +45,210 @@ def test_stub_provider_deterministic():
     r1 = provider.search("q")
     r2 = provider.search("q")
     assert [x["title"] for x in r1] == [x["title"] for x in r2]
+
+
+# ---------------------------------------------------------------------------
+# Unit — WebMarketProvider
+# ---------------------------------------------------------------------------
+
+_SAMPLE_HTML_PAGE = """\
+<h3>2 r&eacute;sultats</h3>
+<div class="accordion" id="accordionElement13769">
+    <div class="card-header element-header">
+        <div class="card-title">
+            <h4> Illustration et narration, projet d&#x27;album jeunesse</h4>
+            <p>Dur&eacute;e maximum : 60 heures / Tarif plein : 350&euro;</p>
+        </div>
+    </div>
+    <div id="element13769" class="collapse">
+        <div class="card-body element-body">
+            <h5>Objectif :</h5>
+            <p>Apprendre &agrave; finaliser un projet d&#x27;&eacute;dition.</p>
+            <a class="element-folder" href="/Element/Details/13769">Voir la fiche</a>
+        </div>
+    </div>
+</div>
+<div class="accordion" id="accordionElement14069">
+    <div class="card-header element-header">
+        <div class="card-title">
+            <h4> Int&eacute;gration de l&#x27;IA g&eacute;n&eacute;rative</h4>
+            <p>Dur&eacute;e maximum : 45 heures / Tarif plein : 260&euro;</p>
+        </div>
+    </div>
+    <div id="element14069" class="collapse">
+        <div class="card-body element-body">
+            <h5>Objectif :</h5>
+            <p>Comprendre les concepts fondamentaux de l&#x27;IA.</p>
+            <a class="element-folder" href="/Element/Details/14069">Voir la fiche</a>
+        </div>
+    </div>
+</div>
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        <li class="page-item active">
+            <button class="page-link" onclick="changePage(0)">1</button>
+        </li>
+        <li class="page-item">
+            <button class="page-link" onclick="changePage(1)">2</button>
+        </li>
+        <li class="page-item">
+            <button class="page-link" onclick="changePage(2)">3</button>
+        </li>
+    </ul>
+</nav>
+"""
+
+_SAMPLE_HTML_LAST_PAGE = """\
+<h3>2 r&eacute;sultats</h3>
+<div class="accordion" id="accordionElement99999">
+    <div class="card-header element-header">
+        <div class="card-title">
+            <h4> Dernier cours du catalogue</h4>
+            <p>Dur&eacute;e maximum : 30 heures / Tarif plein : 200&euro;</p>
+        </div>
+    </div>
+    <div id="element99999" class="collapse">
+        <div class="card-body element-body">
+            <h5>Objectif :</h5>
+            <p>Objectif final.</p>
+        </div>
+    </div>
+</div>
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        <li class="page-item">
+            <button class="page-link" onclick="changePage(0)">1</button>
+        </li>
+        <li class="page-item active">
+            <button class="page-link" onclick="changePage(2)">3</button>
+        </li>
+    </ul>
+</nav>
+"""
+
+_SAMPLE_HTML_EMPTY = """\
+<h3>0 r&eacute;sultats</h3>
+"""
+
+
+def test_web_provider_parse_page():
+    provider = WebMarketProvider(client=MagicMock())
+    results = provider._parse_page(_SAMPLE_HTML_PAGE)
+    assert len(results) == 2
+    assert results[0]["title"] == "Illustration et narration, projet d'album jeunesse"
+    assert results[0]["school"] == "SCAP / Cours d'Adultes de Paris"
+    assert results[0]["source_url"] == "https://scap.paris.fr/Element/Details/13769"
+    assert "finaliser" in results[0]["summary"]
+    assert results[0]["category"] is None
+
+
+def test_web_provider_has_next_true():
+    assert WebMarketProvider._has_next(_SAMPLE_HTML_PAGE) is True
+
+
+def test_web_provider_has_next_false():
+    assert WebMarketProvider._has_next(_SAMPLE_HTML_LAST_PAGE) is False
+
+
+def test_web_provider_has_next_empty():
+    assert WebMarketProvider._has_next(_SAMPLE_HTML_EMPTY) is False
+
+
+def test_web_provider_search_single_page():
+    session = MagicMock()
+    resp = MagicMock()
+    resp.text = _SAMPLE_HTML_LAST_PAGE
+    resp.raise_for_status.return_value = None
+    session.post.return_value = resp
+
+    provider = WebMarketProvider(client=session)
+    results = provider.search("test")
+    assert len(results) == 1
+    assert results[0]["title"] == "Dernier cours du catalogue"
+
+
+def test_web_provider_search_multi_page():
+    session = MagicMock()
+    resp1 = MagicMock()
+    resp1.text = _SAMPLE_HTML_PAGE
+    resp1.raise_for_status.return_value = None
+    resp2 = MagicMock()
+    resp2.text = _SAMPLE_HTML_LAST_PAGE
+    resp2.raise_for_status.return_value = None
+    session.post.side_effect = [resp1, resp2]
+
+    provider = WebMarketProvider(client=session)
+    results = provider.search("test")
+    assert len(results) == 3  # 2 from page 0 + 1 from page 1
+    assert session.post.call_count == 2
+
+
+def test_web_provider_result_keys():
+    session = MagicMock()
+    resp = MagicMock()
+    resp.text = _SAMPLE_HTML_LAST_PAGE
+    resp.raise_for_status.return_value = None
+    session.post.return_value = resp
+
+    provider = WebMarketProvider(client=session)
+    results = provider.search("test")
+    for r in results:
+        assert "title" in r
+        assert "school" in r
+        assert "source_url" in r
+        assert "summary" in r
+        assert "category" in r
+
+
+def test_web_provider_search_http_error():
+    session = MagicMock()
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = Exception("HTTP 500")
+    session.post.return_value = resp
+
+    provider = WebMarketProvider(client=session)
+    with pytest.raises(Exception, match="HTTP 500"):
+        provider.search("test")
+
+
+def test_web_provider_search_empty_page():
+    session = MagicMock()
+    resp = MagicMock()
+    resp.text = _SAMPLE_HTML_EMPTY
+    resp.raise_for_status.return_value = None
+    session.post.return_value = resp
+
+    provider = WebMarketProvider(client=session)
+    results = provider.search("test")
+    assert len(results) == 0
+
+
+def test_web_provider_search_last_page_with_pagination():
+    """Dernière page avec pagination (active == max) → s'arrête."""
+    session = MagicMock()
+    resp = MagicMock()
+    resp.text = _SAMPLE_HTML_LAST_PAGE
+    resp.raise_for_status.return_value = None
+    session.post.return_value = resp
+
+    provider = WebMarketProvider(client=session)
+    results = provider.search("test")
+    assert len(results) == 1
+    assert session.post.call_count == 1
+
+
+@patch("app.services.market_service.settings")
+def test_get_market_provider_web(mock_settings):
+    mock_settings.market_provider = "web"
+    provider = get_market_provider()
+    assert isinstance(provider, WebMarketProvider)
+
+
+@patch("app.services.market_service.settings")
+def test_get_market_provider_stub(mock_settings):
+    mock_settings.market_provider = "stub"
+    provider = get_market_provider()
+    assert isinstance(provider, StubMarketProvider)
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +354,7 @@ async def test_market_scan_with_existing_scap(db_session):
     ))
     await db_session.flush()
 
-    result = await run_market_scan(db_session, user_id=1)
+    await run_market_scan(db_session, user_id=1)
     mc_result = await db_session.execute(
         select(MarketCourse).where(
             MarketCourse.title == "Excel avancé — tableaux croisés dynamiques"
