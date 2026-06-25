@@ -1,5 +1,5 @@
 ﻿# Lessons — ATLAS_Insight
-**Updated:** 2026-06-25 — session 3
+**Updated:** 2026-06-26 — session 4
 
 ## Format
 Chaque entrée suit le template :
@@ -152,3 +152,25 @@ Extension du scope : remplacer la veille mono-source SCAP par un système multi-
 5 décisions validées ensemble : (1) Déprécié MarketSearchProvider → SCAP réécrit en ScraperAdapter, (2) MarketCourse.school_registry_id FK + string fallback legacy, (3) endpoint /dashboard/counts plutôt que /ui/counts, (4) scoring à la promotion SchoolCourse→MarketCourse via _compute_relevance() existant, (5) content hash title+URL simple au lieu de SHA-256.
 ### Règle
 Avant de restructurer un pipeline d'ingestion, valider par sous-agents les conflits avec l'existant (modèles, endpoints, conventions). Les décisions de transition (dépréciation, migration FK, conventions naming) doivent être documentées dans ROADMAP.md + project-memory.md avant l'implémentation.
+
+## 2026-06-26 — Phase 1c : datetime naive/aware dans gap service
+### Contexte
+GapAnalysisService._pass2_creation() compare first_seen_at (SQLite) avec cutoff_30d (datetime.now(timezone.utc))
+### Problème
+SQLite stocke les datetimes sans timezone (offset-naive), datetime.now(timezone.utc) est offset-aware. La comparaison `>=` lève `TypeError: can't compare offset-naive and offset-aware datetimes`, rollback la transaction entière → aucune recommandation persistée.
+### Cause
+Ligne #330 de gap_service.py utilisait `datetime.now(timezone.utc)` par habitude d'UTC, sans réaliser que SQLAlchemy/SQLite renvoie des naives.
+### Solution
+Remplacé par `datetime.now()` (naive) — cohérent avec le format SQLite. La pass1 closure n'était pas touchée car elle ne fait pas de comparaison temporelle.
+### Règle
+Dans un projet SQLite (pas de timezone en base), utiliser `datetime.now()` sans timezone pour toutes les comparaisons temporelles internes. Ne mélanger naive et aware que si la base stocke explicitement des timezone.
+
+## 2026-06-26 — transition-all sur UI boutons/nav/cards (PC Mairie)
+### Contexte
+Review impeccable a détecté `transition-all` sur boutons, nav links et cards dashboard — fait transiter toutes les propriétés (width, height, padding…), pas seulement celles qui changent.
+### Problème
+Inutile sur les PC Mairie visés (bas de gamme) : `transition-all` force le navigateur à écouter les changements de toutes les propriétés animables, gaspillage CPU/GPU pour des éléments qui ne changent que color/bg/transform.
+### Solution
+Remplacé par `transition` (Tailwind default property set), `duration-[var(--duration-normal)]`, `ease-[var(--ease-out)]`. Progress bar → `transition-[width,background-color]` explicite car width n'est pas dans le default set.
+### Règle
+Ne pas utiliser `transition-all` sur les composants d'UI fréquents. Préférer `transition` (set par défaut : color, bg, opacity, shadow, transform) ou un set explicite. Lier `duration-*` et `ease-*` aux tokens CSS quand ils existent (`--duration-normal`, `--ease-out`).

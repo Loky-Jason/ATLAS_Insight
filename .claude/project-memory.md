@@ -1,22 +1,23 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-06-25 — Roadmap v2 validée : Phase 1a ✅, Phase 1b (multi-school) + Phase 1c (gap analysis) + UX refonte planifiés. Backend 133/133, frontend build vert. Dernier commit `0413f34` (master, GitHub Loky-Jason/ATLAS_Insight).
+**Last:** 2026-06-26 — Phase 1b + 1c complètes. Backend 133/133, frontend build OK. Dernier commit `ae9a60a` (master, GitHub Loky-Jason/ATLAS_Insight).
 
 ## État pour reprise (OpenCode)
-- Phase 0 + Phase 1a complètes. Roadmap étendue avec Phase 1b (veille multi-écoles), Phase 1c (gap analysis), Phase UX (refonte navigation + dashboard hub).
-- 5 décisions clés validées : (1) dépréciation `MarketSearchProvider` → scraper adapters + registre, (2) `MarketCourse.school_registry_id FK` + string fallback, (3) endpoint `/dashboard/counts` plutôt que `/ui/counts`, (4) scoring à la promotion SchoolCourse → MarketCourse, (5) content hash title+URL simple.
-- Prochaine session : démarrer Phase 1b — SchoolRegistry model + scraper adapter interface + SCAP adapter migration.
-- Lancer en local : backend `cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000` (copier `.env.example`→`.env`, générer SECRET_KEY `python -c "import secrets;print(secrets.token_hex(32))"`) ; frontend `cd frontend && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin123`.
+- **Phase 0** ✅, **Phase 1a** ✅, **Phase 1b** ✅ (multi-school scraper engine : SchoolRegistry, SchoolCourse, MarketScanRun ; SCAP + Stub adapters ; ScannerService + diff hash-based ; endpoints schools CRUD/scan/diff/counts), **Phase 1c** ✅ (gap analysis engine : GapRecommendation model, ClosureScorer + CreationScorer 5 facteurs, endpoints analyze/candidates/suggestions/approve/list). **Phase UX** 📝 (planifiée, non démarrée).
+- Bug fix clé Phase 1c : `datetime.now(timezone.utc)` → `datetime.now()` (SQLite offset-naive vs aware crashait la pass2 creation).
+- Review impeccable post-Phase 1c : `transition-all`→`transition` sur boutons/nav/cards + tokens anim CSS vars ; `<select transition-colors>` inert retiré ; MASTER.md design sync dark theme.
+- Prochaine session : Phase UX — sidebar hiérarchique (Veille/Recommandations/Catalogue) + dashboard hub badges + redirections anciens chemins.
+- Lancer en local : backend `cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000` ; frontend `cd frontend && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin123`.
 - Règle process : après chaque sprint front+back, faire un **run d'intégration réel** (serveurs lancés + parcours navigateur) — les sous-agents valident build/pytest, pas le runtime câblé.
 
 ## Architecture
 
 ### Backend — FastAPI async
 - `app/core/` — config (pydantic-settings), DB (SQLAlchemy async + aiosqlite), security (argon2 + JWT)
-- `app/models/` — 6 entités actuelles : User, Course, MarketCourse, CourseProposal, AuditLog, Favorite. **À ajouter :** SchoolRegistry, SchoolCourse, MarketScanRun, GapRecommendation
-- `app/schemas/` — Pydantic v2 (Create/Update/Read par entité) + `analytics.py`
-- `app/api/` — 8 routers actuels. **À ajouter :** schools, gap-recommendations, dashboard (counts)
-- `app/services/` — analytics, import, estimation (difflib), certification (14 règles), market (StubProvider, **à déprécier**)
-- `app/scrapers/` — **NOUVEAU** répertoire pour adapters scraper (SCAP, ORSYS, Cegos, Demos…)
+- `app/models/` — 9 entités : User, Course, MarketCourse, CourseProposal, AuditLog, Favorite, SchoolRegistry, SchoolCourse, MarketScanRun, GapRecommendation
+- `app/schemas/` — Pydantic v2 (Create/Update/Read par entité) + `analytics.py` + `gap_recommendation.py`
+- `app/api/` — 12 routers : analytics, audit_logs, auth, certification, courses, estimate, favorites, imports, market, market_courses, proposals, **schools**, **school_courses**, **scan_runs**, **dashboard**, **gap_recommendations**
+- `app/services/` — analytics, import, estimation (difflib), certification (14 règles), market (StubProvider déprécié), **scanner_service**, **gap_service** (ClosureScorer + CreationScorer)
+- `app/scrapers/` — adapters scraper : **base.py** (ABC + registry), **scap.py** (httpx sync), **stub.py** (mock data)
 - `tests/` — Pytest async, **133/133**
 - API préfixe `/api/v1`. Mutations destructives = require_admin + AuditLog.
 
@@ -53,3 +54,7 @@
 | **Content hash title+URL (pas SHA-256)** | Roadmap v2 | Suffisant pour détection modifs, coût implémentation minimal |
 | **Workflow post-approbation GapRecommendation** | Roadmap v2 | Création→CourseProposal(draft), Fermeture→archive Course+AuditLog |
 | **score_breakdown = Pydantic model typé (pas str JSON)** | Roadmap v2 | Évite les bugs de validation qu'ont `based_on` et `certification_suggestions` |
+| **Gap analysis : 5 facteurs pondérés (Closure + Creation)** | Phase 1c | schools_validation 30%, category_gap 25%, cert_potential 15%, no_scap_equivalent 15%, recent_discovery 10%. Seuil 40%, est. heures via difflib |
+| **datetime.now() sans timezone pour SQLite** | Phase 1c | SQLite stocke naive — `datetime.now(timezone.utc)` crashe les comparaisons temporelles en pass2 |
+| **transition-all → transition sur composants UI** | Review Phase 1c | Perf PC Mairie : set Tailwind default (color/bg/opacity/shadow/transform) suffit |
+| **Anim tokens CSS vars liés aux classes Tailwind** | Review Phase 1c | `duration-[var(--duration-normal)]`, `ease-[var(--ease-out)]` connectent tokens emil-design-eng |
