@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
+from app.schemas.analytics import AnalyticsPopularity
 from app.services.analytics_service import (
     get_flop_courses,
     get_top_courses,
@@ -23,7 +24,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analytics", tags=["Analytique"])
 
 
-@router.get("/popularity", summary="Top et flop des cours par popularité")
+@router.get(
+    "/popularity",
+    response_model=AnalyticsPopularity,
+    summary="Top et flop des cours par popularité",
+)
 async def get_popularity(
     limit: int = Query(default=10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),

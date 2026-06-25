@@ -122,3 +122,13 @@ Backend et frontend codés par sous-agents séparés, contrats jamais confronté
 BASE_URL→`/api/v1` ; backend analytics aligné sur le contrat front (most_popular/least_popular + agrégats via `get_totals`) + tests MAJ. Vérifié en live : login + dashboard + CRUD OK
 ### Règle
 Après un sprint front+back en parallèle, faire UN run d'intégration réel (serveurs lancés + parcours navigateur) avant de déclarer livré. Le build vert ≠ le runtime câblé. Ajouter à terme une error boundary React + des tests de contrat (schémas partagés).
+
+## 2026-06-25 — Verrouiller les contrats API avec response_model
+### Contexte
+Review du correctif analytics : endpoint renvoyait `dict[str, Any]` sans schéma
+### Problème
+Sans `response_model`, la forme de la réponse peut dériver sans alerte (cause initiale du bug front/back). `.env.example` frontend pointait aussi sur `:8000` sans `/api/v1`
+### Solution
+Schéma Pydantic `AnalyticsPopularity`/`PopularityEntry` + `response_model` sur `/analytics/popularity` ; `.env.example` corrigé vers `/api/v1`
+### Règle
+Tout endpoint consommé par le front DOIT avoir un `response_model` Pydantic (verrou de contrat + OpenAPI). Les `.env.example` doivent contenir une valeur fonctionnelle telle quelle.
