@@ -24,6 +24,10 @@ from app.api.imports import router as imports_router
 from app.api.market import router as market_router
 from app.api.market_courses import router as market_courses_router
 from app.api.proposals import router as proposals_router
+from app.api.schools import router as schools_router
+from app.api.school_courses import router as school_courses_router
+from app.api.scan_runs import router as scan_runs_router
+from app.api.dashboard import router as dashboard_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +84,10 @@ app.include_router(imports_router, prefix="/api/v1")
 app.include_router(market_router, prefix="/api/v1")
 app.include_router(market_courses_router, prefix="/api/v1")
 app.include_router(proposals_router, prefix="/api/v1")
+app.include_router(schools_router, prefix="/api/v1")
+app.include_router(school_courses_router, prefix="/api/v1")
+app.include_router(scan_runs_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------

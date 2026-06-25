@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class MarketCourseCreate(BaseModel):
     title: str = Field(min_length=1, max_length=512)
     school: str | None = None
+    school_registry_id: int | None = None
     source_url: str | None = None
     summary: str | None = None
     relevance_score: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -21,6 +22,7 @@ class MarketCourseCreate(BaseModel):
 class MarketCourseUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=512)
     school: str | None = None
+    school_registry_id: int | None = None
     source_url: str | None = None
     summary: str | None = None
     relevance_score: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -37,6 +39,7 @@ class MarketCourseRead(BaseModel):
     id: int
     title: str
     school: str | None
+    school_registry_id: int | None
     source_url: str | None
     summary: str | None
     relevance_score: float | None

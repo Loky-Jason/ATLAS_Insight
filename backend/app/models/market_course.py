@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
@@ -16,6 +16,9 @@ class MarketCourse(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     school: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    school_registry_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("school_registries.id", ondelete="SET NULL"), nullable=True
+    )
     source_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     relevance_score: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -30,3 +33,5 @@ class MarketCourse(Base):
         server_default=func.now(),
         default=lambda: datetime.now(timezone.utc),
     )
+
+    school_registry: Mapped["SchoolRegistry | None"] = relationship(back_populates="market_courses")
