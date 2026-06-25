@@ -1,6 +1,6 @@
-# ROADMAP — ATLAS_Insight
+# ROADMAP — ATLAS_Insight v2
 
-> Dashboard décisionnel SCAP.paris
+> Dashboard décisionnel SCAP.paris — veille multi-écoles + gap analysis
 > Source de vérité : `docs/SPEC.md`
 
 ---
@@ -9,9 +9,9 @@
 
 | Module | Statut | Détail |
 |--------|--------|--------|
-| Scaffolding | ✅ | Vite + FastAPI + SQLite, 3 commits |
+| Scaffolding | ✅ | Vite + FastAPI + SQLite |
 | Auth | ✅ | Register/login/logout/me, argon2 + JWT httpOnly, bootstrap admin |
-| Data model | ✅ | 5 entités (User, Course, MarketCourse, CourseProposal, AuditLog) |
+| Data model | ✅ | 6 entités (User, Course, MarketCourse, CourseProposal, AuditLog, Favorite) |
 | Import Excel/CSV | ✅ | pandas + openpyxl, protection injection formules, validation colonnes |
 | Analytics | ✅ | Popularity score, top/flop, refresh endpoint |
 | Dashboard UI | ✅ | Recharts bar charts, stats cards, fallback mock data |
@@ -20,20 +20,20 @@
 
 ---
 
-## 🔜 Phase 1 — Veille, estimation, certification _(quasi terminée)_
+## ✅ Phase 1a — CRUD + services _(terminée)_
 
-| Module | Priorité | Dépendances | Spec | Statut |
-|--------|----------|-------------|------|--------|
-| **1.1** Courses CRUD frontend | P0 | API courses existant | `specs/courses-ui.md` | ✅ Fait (build vert) |
-| **1.2** MarketCourse CRUD frontend | P0 | API market_courses | `specs/market-crud.md` | ✅ Fait |
-| **1.3** CourseProposal CRUD frontend | P0 | API course_proposals | `specs/proposals-crud.md` | ✅ Fait |
-| **1.4** Import UI frontend | P1 | API imports existant | `specs/import-ui.md` | ✅ Fait |
-| **1.5** Veille marché auto | P1 | API recherche web + LLM | `specs/market-veille.md` | 🟡 Stub livré — provider web réel à brancher (`get_market_provider()`) |
-| **1.6** Favoris (Favorite model + UI) | P1 | Auth existante | `specs/favorites.md` | ✅ Backend fait ; UI bouton favori dans Courses |
-| **1.7** Estimation heures | P1 | Logique métier par similarité | `specs/estimation.md` | ✅ Fait (difflib + fallbacks) |
-| **1.8** Suggestions certification | P1 | RNCP + open badge matching | `specs/certification.md` | ✅ Fait (14 règles) |
-| **1.9** Tests Phase 1 | P1 | Chaque module | — | ✅ Backend 121/121 ; frontend build vert |
-| **1.10** Passe design (ui-ux-pro-max → impeccable) | P1 | Pages Phase 1 | — | ⏳ À faire |
+| Module | Statut | Détail |
+|--------|--------|--------|
+| Courses CRUD frontend | ✅ | Liste, filtres, recherche, édition |
+| MarketCourse CRUD frontend | ✅ | Tableau veille + sources + score pertinence |
+| CourseProposal CRUD frontend | ✅ | Liste propositions avec estim/certif |
+| Import UI frontend | ✅ | Upload Excel/CSV avec statut et historique |
+| Estimation heures | ✅ | difflib + fallbacks, basis borné |
+| Suggestions certification | ✅ | 14 règles RNCP + open badge |
+| Favoris | ✅ | Backend + UI bouton favori |
+| WebMarketProvider (SCAP) | ✅ | API SCAP `POST /Search/Elements`, parsing regex stdlib, pagination auto |
+| Passe design (ui-ux-pro-max → impeccable) | ✅ | Design system, theme HSL, AppShell, Dashboard, animations |
+| Tests | ✅ | Backend 133/133 ; frontend build vert |
 
 ### Modules API backend
 
@@ -41,19 +41,97 @@
 - ✅ `app/api/proposals.py` — CRUD CourseProposal (idem)
 - ✅ `app/api/audit_logs.py` — GET list audit logs (paginé, admin only)
 - ✅ `app/api/favorites.py` — CRUD Favoris (isolés par user)
-- ✅ `app/models/favorite.py` + `app/schemas/favorite.py` — Favorite (model_validator: exactement 1 FK)
 - ✅ `app/api/estimate.py` — POST `/estimate/hours` (similarité difflib)
 - ✅ `app/api/certification.py` — POST `/certification/suggest` (14 règles)
-- ✅ `app/api/market.py` — POST `/market/scan` (admin) + `market_service.py` (StubProvider, scoring) — provider web réel à brancher
+- ✅ `app/api/market.py` — POST `/market/scan` (admin) + `market_service.py` **(déprécié en faveur de Phase 1b)**
 - ✅ `app/services/estimation_service.py` — Calcul heures estimées
 - ✅ `app/services/certification_service.py` — Matching RNCP / open badge
 
-### Pages frontend à créer
+---
 
-- `src/pages/Courses/index.tsx` — Liste CRUD avec filtres, recherche, édition
-- `src/pages/MarketWatch/index.tsx` — Tableau veille + sources + score pertinence
-- `src/pages/Proposals/index.tsx` — Liste propositions avec estim/certif
-- `src/pages/Import/index.tsx` — Upload Excel/CSV avec statut et historique
+## 🔜 Phase 1b — Moteur de veille multi-écoles _(planifiée)_
+
+**Objectif** : Remplacer le pipeline mono-source `MarketSearchProvider` par un système multi-école à base de scraper adapters et d'un registre d'écoles.
+
+| Module | Priorité | Dépendances | Statut |
+|--------|----------|-------------|--------|
+| **SchoolRegistry** (modèle + CRUD) | P0 | Aucune | 📝 |
+| **SchoolCourse** (modèle brut scrappé) | P0 | SchoolRegistry | 📝 |
+| **MarketScanRun** (audit trail scans) | P0 | SchoolRegistry | 📝 |
+| **Scraper Adapters** (interface + registry) | P0 | Aucune | 📝 |
+| **SCAP adapter** (migration WebMarketProvider) | P0 | Scraper Adapters | 📝 |
+| **Scanner orchestrator** | P0 | SchoolRegistry + Adapters | 📝 |
+| **Promouvoir** (SchoolCourse → MarketCourse) | P1 | SchoolCourse + MarketCourse | 📝 |
+| **Endpoints API** (schools CRUD, scan, diff) | P0 | Modèles | 📝 |
+| **UI Écoles suivies** (CRUD écoles) | P1 | Endpoints API | 📝 |
+| **UI Résultats scan** (visualisation diffs) | P1 | Endpoints API | 📝 |
+| **UI Journal modifs** (historique) | P1 | Endpoints API | 📝 |
+| Tests | P1 | Chaque module | 📝 |
+
+### Décisions architecturales
+- `MarketSearchProvider` **déprécié** — SCAP réécrit comme `ScraperAdapter("SCAP", ...)` dans le registre
+- `MarketCourse.school` → **gardé comme string fallback** + ajout de `school_registry_id FK` optionnelle
+- **Promotion** : `SchoolCourse` (raw) → `MarketCourse` (curated, status="candidate"), réutilise `_compute_relevance()`
+- **Content hash** : simple hash title+URL plutôt que checksum SHA-256 normalisé
+
+---
+
+## 🔜 Phase 1c — Gap Analysis Engine _(planifiée)_
+
+**Objectif** : Croiser les cours SCAP avec les données marché pour recommander fermetures et créations.
+
+| Module | Priorité | Dépendances | Statut |
+|--------|----------|-------------|--------|
+| **GapRecommendation** (modèle + CRUD) | P0 | Phase 1b | 📝 |
+| **Closure Scorer** (algorithme 5 facteurs) | P0 | SCAP Courses + SchoolCourse | 📝 |
+| **Creation Scorer** (algorithme 5 facteurs) | P0 | SchoolCourse | 📝 |
+| **GapAnalysisService** (orchestrateur) | P0 | Scorers + modèles | 📝 |
+| **Workflow post-approbation** | P1 | GapRecommendation | 📝 |
+| **Endpoints API** (closure-candidates, creation-suggestions, from-market, from-course) | P0 | GapAnalysisService | 📝 |
+| **UI Recommandations** (À fermer, À créer) | P1 | Endpoints API | 📝 |
+
+### Workflow post-approbation
+```
+GapRecommendation (approved)
+  ├ type=creation → CourseProposal (draft, based_on recommandation.id)
+  └ type=closure  → Course.status="archived" + AuditLog
+```
+
+---
+
+## 🔜 Phase UX — Refonte interface _(planifiée)_
+
+**Objectif** : Navigation hiérarchique, dashboard hub avec badges, actions one-click.
+
+| Module | Priorité | Dépendances | Statut |
+|--------|----------|-------------|--------|
+| **Sidebar restructurée** (hiérarchie 3 niveaux) | P0 | Aucune (structure seule) | 📝 |
+| **Redirections anciens chemins** | P0 | Routes restructurées | 📝 |
+| **Dashboard hub** (stats + badges + widgets) | P1 | Phase 1b endpoints | 📝 |
+| **Widget changements récents** | P1 | Endpoints scan/diff | 📝 |
+| **Widget recommandations one-click** | P1 | Phase 1c endpoints | 📝 |
+| **Endpoints dashboard/counts** | P0 | Phases 1b+1c | 📝 |
+| **Badges live navigation** | P1 | Endpoints counts | 📝 |
+| Tests intégration bout-en-bout | P1 | Tout ce qui précède | 📝 |
+
+### Nouvelle arborescence
+```
+📊 Tableau de bord
+─────────────────────
+🔍 Veille
+  ├ Résultats de scan       [badge nouveautés]
+  ├ Journal des modifs
+  └ Écoles suivies
+💡 Recommandations
+  ├ À fermer                [badge]
+  ├ À créer                 [badge]
+  └ Propositions            (existant)
+─────────────────────
+📚 Catalogue
+  ├ Cours SCAP              (existant)
+  ├ Import                  (existant)
+  └ Archives                (existant)
+```
 
 ---
 
@@ -70,14 +148,28 @@
 
 ---
 
+## Séquencement recommandé
+
+```
+Semaine 1 : 1b (SchoolRegistry + scraper adapters + SchoolCourse + MarketScanRun)
+            + UX sidebar (structure seule, composants vides)
+Semaine 2 : 1b (Promouvoir + scanner orchestrator)
+            + UX Dashboard hub (sans données dynamiques)
+Semaine 3 : 1c (GapAnalysisService + ClosureScorer + CreationScorer + GapRecommendation)
+            + connexion UX aux données réelles
+Semaine 4 : UX final (badges live, one-click actions, polish)
+            + tests intégration bout-en-bout
+```
+
 ## Jalons
 
 | Jalon | Date cible | Livrables |
 |-------|-----------|-----------|
 | M0 — Phase 0 | ✅ Terminé | Auth, CRUD, import, dashboard |
-| M1a — Phase 1 CRUD | TBD | CRUD frontend complet (Courses, MarketWatch, Proposals) + Import UI |
-| M1b — Phase 1 Veille | TBD | Veille marché automatisée avec sources + score pertinence |
-| M1c — Phase 1 Estim+Certif+Fav | TBD | Estimation heures + certification + favoris |
+| M1a — Phase 1a | ✅ Terminé | CRUD frontend, estimation, certification, favoris, design |
+| M1b — Phase 1b | TBD | Multi-school scraper, SchoolRegistry, SchoolCourse, promotion |
+| M1c — Phase 1c | TBD | Gap Analysis, recommandations fermeture/création |
+| MUX — Refonte UX | TBD | Navigation hiérarchique, dashboard hub, badges |
 | M2 — Phase 2 | TBD | Export PDF/Word + archivage avancé |
 | M3 — Production | TBD | Migration M365/Entra ID |
 
@@ -85,6 +177,6 @@
 
 ## Conventions de branche
 
-- `master` — stable, Phase 0 livrée
-- `feat/<module>` — branches feature (ex: `feat/market-watch`, `feat/export-pdf`)
+- `master` — stable
+- `feat/<module>` — branches feature (ex: `feat/school-registry`, `feat/gap-analysis`, `feat/ux-refont`)
 - Commits en Conventional Commits (caveman style)

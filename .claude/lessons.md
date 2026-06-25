@@ -142,3 +142,13 @@ Sub-agent `review-changes` a audité les modifs Phase 1b (WebMarketProvider). A 
 (1) `requests`→`httpx` (promu en dep principale) ; (2) `query` passé comme `Keywords` dans le payload SCAP via `_fetch_page(page, query)` ; (3) `close()` abstrait dans ABC + implémenté Stub (pass) / Web (`self._http.close()`)
 ### Règle
 Un sub-agent de review peut skipper des issues pour trade-off explicables, MAIS toujours demander confirmation avant de les laisser non corrigées. Parfois le skip est juste de la paresse.
+
+## 2026-06-25 — Décisions roadmap v2 (multi-école + gap analysis + UX)
+### Contexte
+Extension du scope : remplacer la veille mono-source SCAP par un système multi-école avec gap analysis automatisée.
+### Problème
+11 issues soulevées par sous-agents de validation : double pipeline concurrent (ancien MarketSearchProvider vs nouveau ScraperAdapter), conflit MarketCourse.school (string vs FK), endpoint /ui/counts hors convention, scoring non défini dans le nouveau pipeline, checksum SHA-256 surdimensionné.
+### Solution
+5 décisions validées ensemble : (1) Déprécié MarketSearchProvider → SCAP réécrit en ScraperAdapter, (2) MarketCourse.school_registry_id FK + string fallback legacy, (3) endpoint /dashboard/counts plutôt que /ui/counts, (4) scoring à la promotion SchoolCourse→MarketCourse via _compute_relevance() existant, (5) content hash title+URL simple au lieu de SHA-256.
+### Règle
+Avant de restructurer un pipeline d'ingestion, valider par sous-agents les conflits avec l'existant (modèles, endpoints, conventions). Les décisions de transition (dépréciation, migration FK, conventions naming) doivent être documentées dans ROADMAP.md + project-memory.md avant l'implémentation.
