@@ -56,6 +56,7 @@ def _safe_close(scraper: Any) -> None:
 def _course_to_dict(c: SchoolCourse) -> dict[str, Any]:
     return {
         "id": c.id,
+        "school_registry_id": c.school_registry_id,
         "external_id": c.external_id,
         "title": c.title,
         "url": c.url,

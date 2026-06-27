@@ -325,8 +325,13 @@ export function SchoolsPage() {
 
   const handleDelete = async (school: SchoolRegistry) => {
     if (!confirm(`Supprimer l'école « ${school.name} » ? Cette action est irréversible.`)) return
-    await schoolsApi.delete(school.id)
-    await fetchSchools()
+    try {
+      await schoolsApi.delete(school.id)
+      await fetchSchools()
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Erreur inconnue'
+      setErrorMsg(msg)
+    }
   }
 
   const handleScan = async (school: SchoolRegistry) => {
@@ -334,6 +339,9 @@ export function SchoolsPage() {
     try {
       await schoolsApi.scan(school.id)
       await fetchSchools()
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Erreur inconnue'
+      setErrorMsg(msg)
     } finally {
       setScanningIds((prev) => { const next = new Set(prev); next.delete(school.id); return next })
     }
@@ -385,6 +393,18 @@ export function SchoolsPage() {
           </Button>
         )}
       </div>
+
+      {errorMsg && (
+        <Card className="border-destructive/50">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <p className="text-sm text-destructive">{errorMsg}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setErrorMsg(null)}>Fermer</Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">
