@@ -220,22 +220,6 @@ export interface ImportResult {
   filename: string
 }
 
-export interface DashboardCounts {
-  total_schools: number
-  unreviewed_scans: number
-  closure_candidates: number
-  creation_suggestions: number
-}
-
-export interface GapRecommendationList {
-  id: number
-  recommendation_type: 'closure' | 'creation'
-  score: number
-  status: 'draft' | 'approved' | 'rejected' | 'implemented'
-  rationale: string | null
-  created_at: string
-}
-
 export interface AuditLogEntry {
   id: number
   user_id: number | null
@@ -314,6 +298,139 @@ export const favoritesApi = {
   list: () => api.get<Favorite[]>('/favorites'),
   add: (payload: FavoriteCreate) => api.post<Favorite>('/favorites', payload),
   remove: (id: number) => api.delete<void>(`/favorites/${id}`),
+}
+
+// ── Phase 1b : Veille multi-écoles ──────────────────────────────────────────
+
+export interface SchoolRegistry {
+  id: number
+  name: string
+  url: string
+  scraper_strategy: string
+  active: boolean
+  scan_interval: number
+  last_scanned_at: string | null
+  created_at: string
+}
+
+export interface SchoolRegistryCreate {
+  name: string
+  url: string
+  scraper_strategy?: string
+  active?: boolean
+  scan_interval?: number
+}
+
+export interface SchoolRegistryUpdate {
+  name?: string
+  url?: string
+  scraper_strategy?: string
+  active?: boolean
+  scan_interval?: number
+}
+
+export interface SchoolCourse {
+  id: number
+  school_registry_id: number
+  external_id: string
+  title: string
+  url: string | null
+  description: string | null
+  duration_hours: number | null
+  price: number | null
+  category: string | null
+  format: string | null
+  certification: string | null
+  first_seen_at: string
+  last_seen_at: string
+  last_updated_at: string | null
+  is_removed: boolean
+  removed_at: string | null
+}
+
+export interface ScanRun {
+  id: number
+  school_registry_id: number
+  status: string
+  started_at: string
+  finished_at: string | null
+  courses_found: number
+  courses_new: number
+  courses_removed: number
+  courses_modified: number
+  error_msg: string | null
+}
+
+export interface ScanDiff {
+  scan_run: {
+    id: number
+    status: string
+    started_at: string | null
+    finished_at: string | null
+    courses_found: number
+    courses_new: number
+    courses_modified: number
+    courses_removed: number
+    error_msg: string | null
+  } | null
+  new_courses: SchoolCourse[]
+  modified_courses: SchoolCourse[]
+  removed_courses: SchoolCourse[]
+}
+
+export interface DashboardCounts {
+  total_schools: number
+  unreviewed_scans: number
+  closure_candidates: number
+  creation_suggestions: number
+}
+
+export interface GapRecommendationList {
+  id: number
+  recommendation_type: 'closure' | 'creation'
+  score: number
+  status: 'draft' | 'approved' | 'rejected' | 'implemented'
+  rationale: string | null
+  created_at: string
+}
+
+export const schoolsApi = {
+  list: (params?: { active?: boolean }) => {
+    const qs = params?.active !== undefined ? `?active=${params.active}` : ''
+    return api.get<SchoolRegistry[]>(`/schools${qs}`)
+  },
+  get: (id: number) => api.get<SchoolRegistry>(`/schools/${id}`),
+  create: (payload: SchoolRegistryCreate) => api.post<SchoolRegistry>('/schools', payload),
+  update: (id: number, payload: SchoolRegistryUpdate) =>
+    api.patch<SchoolRegistry>(`/schools/${id}`, payload),
+  delete: (id: number) => api.delete<void>(`/schools/${id}`),
+  scan: (id: number) =>
+    api.post<{ school_name: string; status: string; found: number; new: number; modified: number; removed: number; scan_run_id: number }>(`/schools/${id}/scan`),
+  diff: (id: number) => api.get<ScanDiff>(`/schools/${id}/diff`),
+}
+
+export const schoolCoursesApi = {
+  list: (params?: { school_id?: number; is_removed?: boolean; q?: string; skip?: number; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.school_id !== undefined) qs.set('school_id', String(params.school_id))
+    if (params?.is_removed !== undefined) qs.set('is_removed', String(params.is_removed))
+    if (params?.q) qs.set('q', params.q)
+    if (params?.skip !== undefined) qs.set('skip', String(params.skip))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    const query = qs.toString()
+    return api.get<SchoolCourse[]>(`/school-courses${query ? `?${query}` : ''}`)
+  },
+}
+
+export const scanRunsApi = {
+  list: (params?: { school_id?: number; skip?: number; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.school_id !== undefined) qs.set('school_id', String(params.school_id))
+    if (params?.skip !== undefined) qs.set('skip', String(params.skip))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    const query = qs.toString()
+    return api.get<ScanRun[]>(`/scan-runs${query ? `?${query}` : ''}`)
+  },
 }
 
 export const auditLogsApi = {

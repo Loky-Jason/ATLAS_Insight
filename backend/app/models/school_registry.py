@@ -22,7 +22,7 @@ class SchoolRegistry(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    scraper_strategy: Mapped[str] = mapped_column(String(50), nullable=False, default="html")
+    scraper_strategy: Mapped[str] = mapped_column(String(50), nullable=False, default="stub")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     scan_interval: Mapped[int] = mapped_column(Integer, nullable=False, default=1440)
     last_scanned_at: Mapped[datetime | None] = mapped_column(

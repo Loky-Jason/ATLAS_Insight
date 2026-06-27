@@ -12,7 +12,7 @@ from app.core.url_safety import validate_external_url
 class SchoolRegistryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     url: str = Field(min_length=1, max_length=2048)
-    scraper_strategy: str = Field(default="html", max_length=50)
+    scraper_strategy: str = Field(default="stub", max_length=50)
     active: bool = True
     scan_interval: int = Field(default=1440, ge=1)
 
