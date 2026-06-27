@@ -60,6 +60,10 @@ const NAV: (NavItem | NavSection)[] = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+export function isItemActive(item: { to: string; end?: boolean }, currentPath: string): boolean {
+  return matchPath({ path: item.end ?? false ? item.to : `${item.to}/*` }, currentPath) !== null
+}
+
 function isSection(e: NavItem | NavSection): e is NavSection {
   return 'items' in e
 }
@@ -94,10 +98,7 @@ function NavItemLink({ item }: { item: NavItem }) {
 }
 
 function NavSectionBlock({ section, currentPath }: { section: NavSection; currentPath: string }) {
-  const anyActive = section.items.some((item) => {
-    const match = matchPath({ path: item.end ?? false ? item.to : `${item.to}/*` }, currentPath)
-    return match !== null
-  })
+  const anyActive = section.items.some((item) => isItemActive(item, currentPath))
 
   return (
     <div>

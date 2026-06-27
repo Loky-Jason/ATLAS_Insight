@@ -21,6 +21,9 @@ data/
 .env.*
 !.env.example
 
+# Test coverage
+coverage/
+
 # Logs
 *.log
 .ruflo/logs/
