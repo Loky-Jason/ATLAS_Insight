@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
@@ -94,9 +94,10 @@ function NavItemLink({ item }: { item: NavItem }) {
 }
 
 function NavSectionBlock({ section, currentPath }: { section: NavSection; currentPath: string }) {
-  const anyActive = section.items.some((item) =>
-    item.end ?? false ? currentPath === item.to : currentPath.startsWith(item.to),
-  )
+  const anyActive = section.items.some((item) => {
+    const match = matchPath({ path: item.end ?? false ? item.to : `${item.to}/*` }, currentPath)
+    return match !== null
+  })
 
   return (
     <div>

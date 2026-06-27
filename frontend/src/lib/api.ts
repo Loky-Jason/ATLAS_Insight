@@ -137,7 +137,9 @@ export interface CourseUpdate {
 }
 
 export interface PopularityEntry {
+  id: number
   title: string
+  category: string | null
   popularity_score: number
   enrolled_count: number
   dropout_count: number

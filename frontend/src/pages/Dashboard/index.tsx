@@ -262,8 +262,8 @@ export function DashboardPage() {
     try {
       await gapApi.approve(id)
       setRecommendations((prev) => prev.filter((r) => r.id !== id))
-    } catch {
-      // Silently fail — user will see error toast in future
+    } catch (err) {
+      console.error("Approbation échouée", err)
     }
   }
 
@@ -298,7 +298,8 @@ export function DashboardPage() {
     )
   }
 
-  const analytics = data as AnalyticsPopularity
+  if (!data) return null
+  const analytics = data
 
   return (
     <div className="space-y-6">

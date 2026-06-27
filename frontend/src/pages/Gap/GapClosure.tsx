@@ -1,13 +1,19 @@
 import { XCircle } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function GapClosurePage() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <XCircle className="mb-4 h-12 w-12 text-muted-foreground/40" aria-hidden="true" />
-      <h2 className="text-lg font-semibold text-foreground">Recommandations — À fermer</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Cours SCAP candidates à la fermeture (non dispensés ailleurs).
-      </p>
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold">Recommandations — À fermer</h2>
+      <Card>
+        <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+          <XCircle className="h-10 w-10 text-muted-foreground/40" aria-hidden="true" />
+          <p className="font-medium text-muted-foreground">Cours SCAP candidats à la fermeture</p>
+          <p className="max-w-xs text-sm text-muted-foreground/70">
+            Cours non dispensés par les écoles suivies. Analysez et approuvez leur archivage.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   )
 }
