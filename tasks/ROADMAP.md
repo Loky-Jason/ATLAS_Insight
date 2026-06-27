@@ -49,7 +49,9 @@
 
 ---
 
-## 🔜 Phase 1b — Moteur de veille multi-écoles _(planifiée)_
+## ✅ Phase 1b — Moteur de veille multi-écoles _(terminée 2026-06-27)_
+
+> Livrée + poussée (`ee117f0`). Scrapers **SCAP + Stub + ORSYS + Cegos + Demos** (registry), `BaseScraperAdapter` (httpx + template sitemap + bornes), ScannerService diff hash-based, endpoints schools CRUD/scan/diff/counts, UI Écoles/Scans/Journal. Backend 256 tests, front 65 tests. Durci (try/except I/O, MAX_PAGES/MAX_COURSES, anti-SSRF schéma, AuditLog).
 
 **Objectif** : Remplacer le pipeline mono-source `MarketSearchProvider` par un système multi-école à base de scraper adapters et d'un registre d'écoles.
 
@@ -76,7 +78,9 @@
 
 ---
 
-## 🔜 Phase 1c — Gap Analysis Engine _(planifiée)_
+## ✅ Phase 1c — Gap Analysis Engine _(terminée 2026-06-27)_
+
+> Livrée. `GapRecommendation` (+`creation_key`), Closure/Creation scorers 5 facteurs, `gap_service` orchestrateur, endpoints analyze/closure-candidates/creation-suggestions/approve/list, UI Gap (À fermer / À créer). Régression `tests/test_gap_service.py`. Reste perf O(n²)+N+1 (chip `task_8aa9a344`, [[project-atlas-gap-perf]] — 27/06).
 
 **Objectif** : Croiser les cours SCAP avec les données marché pour recommander fermetures et créations.
 
@@ -99,7 +103,9 @@ GapRecommendation (approved)
 
 ---
 
-## 🔜 Phase UX — Refonte interface _(planifiée)_
+## ✅ Phase UX — Refonte interface _(terminée 2026-06-27)_
+
+> Livrée. Sidebar hiérarchique (Veille/Recommandations/Catalogue), redirections anciens chemins, dashboard hub (widgets stats + changements récents + reco one-click), endpoints `dashboard/counts`, badges live. Tests vitest (NavSectionBlock, Dashboard mock-data, Scans, Schools). MarketWatch monolithe retiré.
 
 **Objectif** : Navigation hiérarchique, dashboard hub avec badges, actions one-click.
 
@@ -167,10 +173,10 @@ Semaine 4 : UX final (badges live, one-click actions, polish)
 |-------|-----------|-----------|
 | M0 — Phase 0 | ✅ Terminé | Auth, CRUD, import, dashboard |
 | M1a — Phase 1a | ✅ Terminé | CRUD frontend, estimation, certification, favoris, design |
-| M1b — Phase 1b | TBD | Multi-school scraper, SchoolRegistry, SchoolCourse, promotion |
-| M1c — Phase 1c | TBD | Gap Analysis, recommandations fermeture/création |
-| MUX — Refonte UX | TBD | Navigation hiérarchique, dashboard hub, badges |
-| M2 — Phase 2 | TBD | Export PDF/Word + archivage avancé |
+| M1b — Phase 1b | ✅ 2026-06-27 | Multi-school scraper (5 adaptateurs), SchoolRegistry, SchoolCourse, scan/diff |
+| M1c — Phase 1c | ✅ 2026-06-27 | Gap Analysis, recommandations fermeture/création |
+| MUX — Refonte UX | ✅ 2026-06-27 | Navigation hiérarchique, dashboard hub, badges |
+| M2 — Phase 2 | 🔜 prochaine | Export PDF/Word + archivage avancé |
 | M3 — Production | TBD | Migration M365/Entra ID |
 
 ---

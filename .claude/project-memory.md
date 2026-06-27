@@ -1,5 +1,5 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-06-26 — Revue Phase 1b/1c : 10 points corrigés. **Backend 136/136** (+3 tests gap régression), build front vert, ruff clean (reste 17 E501 cosmétiques).
+**Last:** 2026-06-27 — Phases 1b + 1c + UX **livrées et poussées** (`ee117f0`). Scrapers multi-vendeurs (SCAP/Stub/ORSYS/Cegos/Demos). **Backend 256 tests**, **front 65 tests vitest**, builds verts. Prochaine : **Phase 2** (export PDF/Word, archives).
 
 ## Durcissement revue Phase 1b/1c (2026-06-26)
 - **B1** `gap_service` : recommandations "creation" s'écrasaient toutes en 1 ligne (filtre upsert trop large) → colonne `creation_key` + insertion sans discriminant. Régression `tests/test_gap_service.py`.
@@ -8,11 +8,12 @@
 - Sécu : `app/core/url_safety.py` (anti-SSRF, `field_validator` schéma school) ; AuditLog sur create/update/scan school + gap analyze/approve ; `error_msg` générique `/diff`.
 - `_compute_hash` étendu (durée/prix/desc/catégorie/format/certif). Lint : forward-refs models `TYPE_CHECKING`, `== True/False`→`.is_()`.
 
-## État pour reprise (OpenCode)
-- **Phase 0** ✅, **Phase 1a** ✅, **Phase 1b** ✅ (multi-school scraper engine : SchoolRegistry, SchoolCourse, MarketScanRun ; SCAP + Stub adapters ; ScannerService + diff hash-based ; endpoints schools CRUD/scan/diff/counts), **Phase 1c** ✅ (gap analysis engine : GapRecommendation model, ClosureScorer + CreationScorer 5 facteurs, endpoints analyze/candidates/suggestions/approve/list). **Phase UX** 📝 (planifiée, non démarrée).
-- Bug fix clé Phase 1c : `datetime.now(timezone.utc)` → `datetime.now()` (SQLite offset-naive vs aware crashait la pass2 creation).
-- Review impeccable post-Phase 1c : `transition-all`→`transition` sur boutons/nav/cards + tokens anim CSS vars ; `<select transition-colors>` inert retiré ; MASTER.md design sync dark theme.
-- Prochaine session : Phase UX — sidebar hiérarchique (Veille/Recommandations/Catalogue) + dashboard hub badges + redirections anciens chemins.
+## État pour reprise
+- **Phase 0** ✅, **1a** ✅, **1b** ✅ (scraper engine multi-vendeurs : SchoolRegistry/SchoolCourse/MarketScanRun ; `BaseScraperAdapter` httpx+sitemap+bornes ; adaptateurs **SCAP/Stub/ORSYS/Cegos/Demos** ; ScannerService diff hash ; endpoints schools CRUD/scan/diff/counts ; UI Écoles/Scans/Journal), **1c** ✅ (gap engine : GapRecommendation+`creation_key`, Closure/Creation scorers 5 facteurs, endpoints analyze/candidates/suggestions/approve/list, UI À fermer/À créer), **UX** ✅ (sidebar hiérarchique, dashboard hub badges, redirections, MarketWatch retiré).
+- Datetime tz : **`_as_utc` (aware UTC des 2 côtés)** — remplace l'ancien fix naïf `datetime.now()` qui cassait à la migration Postgres. NE PAS revenir au naïf.
+- `scraper_strategy` défaut = **`stub`** (enregistré ; "html" n'existe pas → 500 sinon).
+- **Prochaine session : Phase 2** — export PDF (WeasyPrint) + Word (python-docx), vue Archives, archivage avancé. Avant : optimiser perf `gap_service` O(n²)+N+1 (chip `task_8aa9a344`, [[project-atlas-gap-perf]]).
+- Fragilité scraping (ponytail, non bloquant) : filtre sitemap `/formation/` hardcodé partagé (orsys+demos) + `<loc>` suivis sans allowlist → durcir au branchement scan réel.
 - Lancer en local : backend `cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000` ; frontend `cd frontend && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin123`.
 - Règle process : après chaque sprint front+back, faire un **run d'intégration réel** (serveurs lancés + parcours navigateur) — les sous-agents valident build/pytest, pas le runtime câblé.
 

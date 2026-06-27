@@ -1,5 +1,17 @@
 ﻿# Lessons — ATLAS_Insight
-**Updated:** 2026-06-26 — session 4
+**Updated:** 2026-06-27 — session 5
+
+## 2026-06-27 — Scrapers multi-vendeurs : fragilité du filtre partagé
+### Contexte
+Ajout adaptateurs ORSYS/Cegos/Demos sur `BaseScraperAdapter` (httpx remonté dans la base, template `_fetch_all_from_sitemap`).
+### Problème
+Le filtre d'URLs sitemap `/formation/` est codé en dur dans `base._fetch_sitemap_urls`, partagé par orsys + demos (vendeurs aux schémas d'URL différents). Si un vendeur change de chemin → 0 cours, **silencieux** (juste un log). De plus les `<loc>` du sitemap sont suivis via `_http.get` sans allowlist d'hôte (SSRF-via-sitemap théorique).
+### Cause
+Mutualisation prématurée d'un détail (le path filter) qui n'est pas commun à tous les vendeurs.
+### Solution
+Laissé tel quel pour l'instant (marqué `ponytail:` dans le commit `ee117f0`) : tout I/O est wrappé try/except, dégrade à 0 cours + log, jamais de crash ; domaines https de confiance. Validable seulement contre les vrais sites.
+### Règle
+Un détail de parsing propre à un vendeur (path filter, sélecteur) ne se mutualise pas dans la base tant qu'il n'est pas prouvé commun. Préférer un override par adaptateur ou un paramètre. Un scraper qui peut renvoyer 0 silencieusement doit logger explicitement le cas « sitemap non vide mais 0 URL retenue ».
 
 ## Format
 Chaque entrée suit le template :
