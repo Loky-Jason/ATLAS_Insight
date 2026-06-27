@@ -1,11 +1,19 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
-  BookOpen,
-  TrendingUp,
+  Search,
+  FileSearch,
+  History,
+  GraduationCap,
   Lightbulb,
-  Archive,
+  XCircle,
+  PlusCircle,
+  FileText,
+  Library,
+  BookOpen,
   Upload,
+  Archive,
   LogOut,
   Activity,
 } from 'lucide-react'
@@ -14,18 +22,108 @@ import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { cn } from '@/lib/utils'
 
-// ── Navigation items ──────────────────────────────────────────────────────────
+// ── Typed nav data ──────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-  { to: '/courses', label: 'Cours SCAP', icon: BookOpen },
-  { to: '/market-watch', label: 'Veille marché', icon: TrendingUp },
-  { to: '/proposals', label: 'Propositions', icon: Lightbulb },
-  { to: '/import', label: 'Import', icon: Upload },
-  { to: '/archives', label: 'Archives', icon: Archive },
-] as const
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
+type NavSection = { label: string; icon: LucideIcon; items: NavItem[] }
 
-// ── AppShell ──────────────────────────────────────────────────────────────────
+const NAV: (NavItem | NavSection)[] = [
+  { to: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard, end: true },
+  {
+    label: 'Veille',
+    icon: Search,
+    items: [
+      { to: '/scan-results', label: 'Résultats de scan', icon: FileSearch },
+      { to: '/changelog', label: 'Journal des modifs', icon: History },
+      { to: '/schools', label: 'Écoles suivies', icon: GraduationCap },
+    ],
+  },
+  {
+    label: 'Recommandations',
+    icon: Lightbulb,
+    items: [
+      { to: '/gap-closure', label: 'À fermer', icon: XCircle },
+      { to: '/gap-creation', label: 'À créer', icon: PlusCircle },
+      { to: '/proposals', label: 'Propositions', icon: FileText },
+    ],
+  },
+  {
+    label: 'Catalogue',
+    icon: Library,
+    items: [
+      { to: '/courses', label: 'Cours SCAP', icon: BookOpen },
+      { to: '/import', label: 'Import', icon: Upload },
+      { to: '/archives', label: 'Archives', icon: Archive },
+    ],
+  },
+]
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function isSection(e: NavItem | NavSection): e is NavSection {
+  return 'items' in e
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function NavItemLink({ item }: { item: NavItem }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end ?? false}
+      className={({ isActive }) =>
+        cn(
+          'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition duration-[var(--duration-normal)] ease-[var(--ease-out)]',
+          isActive
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <div className={cn('flex h-5 w-5 items-center justify-center', isActive && 'text-primary')}>
+            <item.icon className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <span className="flex-1">{item.label}</span>
+          {isActive && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+function NavSectionBlock({ section, currentPath }: { section: NavSection; currentPath: string }) {
+  const anyActive = section.items.some((item) =>
+    item.end ?? false ? currentPath === item.to : currentPath.startsWith(item.to),
+  )
+
+  return (
+    <div>
+      {/* Section header */}
+      <div
+        className={cn(
+          'flex items-center gap-3 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest',
+          anyActive ? 'text-foreground' : 'text-muted-foreground/60',
+        )}
+      >
+        <div className="flex h-5 w-5 items-center justify-center">
+          <section.icon className="h-4 w-4" aria-hidden="true" />
+        </div>
+        <span>{section.label}</span>
+      </div>
+
+      {/* Sub-items */}
+      <div className="ml-3 border-l border-border pl-2">
+        {section.items.map((item) => (
+          <NavItemLink key={item.to} item={item} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell() {
   const { user, logout } = useAuth()
@@ -55,37 +153,14 @@ export function AppShell() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/dashboard'}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition duration-[var(--duration-normal)] ease-[var(--ease-out)]',
-                  isActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className={cn(
-                    'flex h-5 w-5 items-center justify-center',
-                    isActive && 'text-primary',
-                  )}>
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </div>
-                  <span className="flex-1">{label}</span>
-                  {isActive && (
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+          {NAV.map((entry) =>
+            isSection(entry) ? (
+              <NavSectionBlock key={entry.label} section={entry} currentPath={location.pathname} />
+            ) : (
+              <NavItemLink key={entry.to} item={entry} />
+            ),
+          )}
         </nav>
 
         {/* Footer */}
