@@ -54,9 +54,6 @@ _STUB_DATA: list[NormalisedCourse] = [
 
 @register_scraper("stub")
 class StubScraperAdapter(BaseScraperAdapter):
-    def __init__(self, school_registry_id: int) -> None:
-        super().__init__(school_registry_id)
-
     def fetch_all_courses(self) -> list[NormalisedCourse]:
         logger.info(
             "StubScraperAdapter.fetch_all_courses() — %d cours fictifs.",
@@ -64,5 +61,4 @@ class StubScraperAdapter(BaseScraperAdapter):
         )
         return list(_STUB_DATA)
 
-    def close(self) -> None:
-        pass
+

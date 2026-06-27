@@ -29,11 +29,6 @@ class SCAPScraperAdapter(BaseScraperAdapter):
     SEARCH_URL = "https://scap.paris.fr/Search/Elements"
     MAX_PAGES = 200
 
-    def __init__(self, school_registry_id: int) -> None:
-        super().__init__(school_registry_id)
-        self._http = httpx.Client()
-        self._http.headers.update({"User-Agent": "ATLAS-Insight/1.0"})
-
     def fetch_all_courses(self) -> list[NormalisedCourse]:
         logger.info("SCAPScraperAdapter.fetch_all_courses() — scraping catalogue SCAP...")
         results: list[NormalisedCourse] = []
@@ -120,5 +115,4 @@ class SCAPScraperAdapter(BaseScraperAdapter):
             return False
         return int(current.group(1)) < max_page
 
-    def close(self) -> None:
-        self._http.close()
+
