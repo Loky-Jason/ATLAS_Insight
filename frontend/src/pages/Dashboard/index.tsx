@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import { BookOpen, Users, UserMinus, AlertTriangle } from 'lucide-react'
-import { api, ApiError, type AnalyticsPopularity } from '@/lib/api'
+import { BookOpen, Users, UserMinus, AlertTriangle, GraduationCap, Sparkles, XCircle, PlusCircle, RefreshCw } from 'lucide-react'
+import { api, ApiError, type AnalyticsPopularity, type DashboardCounts, type GapRecommendationList, dashboardApi, gapApi } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { MOCK_ANALYTICS } from './mock-data'
 import { cn } from '@/lib/utils'
 
-// ── Composant carte de stat ───────────────────────────────────────────────────
+// ── StatCard ─────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string
@@ -41,7 +35,7 @@ function StatCard({ label, value, icon: Icon, className }: StatCardProps) {
   )
 }
 
-// ── Composant graphe popularité ───────────────────────────────────────────────
+// ── PopularityChart ──────────────────────────────────────────────────────────
 
 interface PopularityChartProps {
   title: string
@@ -51,7 +45,6 @@ interface PopularityChartProps {
 }
 
 function PopularityChart({ title, description, data, barColor }: PopularityChartProps) {
-  // Troncature du titre pour l'axe X (espace limité)
   const formatted = data.map((d) => ({
     ...d,
     shortTitle: d.title.length > 20 ? d.title.slice(0, 18) + '…' : d.title,
@@ -87,13 +80,7 @@ function PopularityChart({ title, description, data, barColor }: PopularityChart
               }}
             />
             <Tooltip
-              contentStyle={{
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: 'hsl(var(--foreground))',
-              }}
+              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px', color: 'hsl(var(--foreground))' }}
               formatter={(value: number) => [`${value} / 100`, 'Score popularité']}
               labelFormatter={(label: string) => label}
             />
@@ -109,7 +96,123 @@ function PopularityChart({ title, description, data, barColor }: PopularityChart
   )
 }
 
-// ── Page Dashboard ────────────────────────────────────────────────────────────
+// ── Widget recommandations ───────────────────────────────────────────────────
+
+function RecommendationsWidget({ recommendations, onApprove }: {
+  recommendations: GapRecommendationList[]
+  onApprove: (id: number) => void
+}) {
+  if (recommendations.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recommandations</CardTitle>
+          <CardDescription>Aucune recommandation en attente</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Lancez une analyse depuis la section Recommandations pour générer des suggestions.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Recommandations récentes</CardTitle>
+          <span className="text-xs text-muted-foreground">{recommendations.length} en attente</span>
+        </div>
+        <CardDescription>Actions rapides sur les suggestions les plus pertinentes</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {recommendations.map((rec) => (
+          <div key={rec.id} className="flex items-start gap-3 rounded-md border border-border p-3">
+            <div className={cn(
+              'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+              rec.recommendation_type === 'closure' ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400',
+            )}>
+              {rec.recommendation_type === 'closure' ? <XCircle className="h-3.5 w-3.5" /> : <PlusCircle className="h-3.5 w-3.5" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground truncate">
+                {rec.rationale ?? `Recommandation #${rec.id}`}
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className={cn(
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
+                  rec.recommendation_type === 'closure'
+                    ? 'bg-amber-500/10 text-amber-400'
+                    : 'bg-emerald-500/10 text-emerald-400',
+                )}>
+                  {rec.recommendation_type === 'closure' ? 'Fermeture' : 'Création'}
+                </span>
+                <span className="text-xs tabular-nums text-muted-foreground">Score {rec.score}</span>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 text-xs"
+              onClick={() => onApprove(rec.id)}
+              disabled={rec.status !== 'draft'}
+            >
+              Approuver
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Widget vue d'ensemble ────────────────────────────────────────────────────
+
+function OverviewWidget({ counts }: { counts: DashboardCounts | null }) {
+  if (!counts) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Vue d'ensemble</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="py-4 text-center text-sm text-muted-foreground">Indisponible</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const items = [
+    { label: 'Écoles suivies', value: counts.total_schools, icon: GraduationCap, color: 'text-sky-400' },
+    { label: 'Scans non examinés', value: counts.unreviewed_scans, icon: RefreshCw, color: counts.unreviewed_scans > 0 ? 'text-amber-400' : 'text-muted-foreground' },
+    { label: 'Fermetures proposées', value: counts.closure_candidates, icon: XCircle, color: 'text-amber-400' },
+    { label: 'Créations suggérées', value: counts.creation_suggestions, icon: Sparkles, color: 'text-emerald-400' },
+  ]
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Vue d'ensemble</CardTitle>
+        <CardDescription>État du système de veille</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <item.icon className={cn('h-4 w-4', item.color)} aria-hidden="true" />
+              <span className="text-sm text-muted-foreground">{item.label}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums text-foreground">{item.value}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Page Dashboard ───────────────────────────────────────────────────────────
 
 type LoadState = 'loading' | 'ok' | 'mock' | 'error'
 
@@ -118,21 +221,29 @@ export function DashboardPage() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Hub data
+  const [counts, setCounts] = useState<DashboardCounts | null>(null)
+  const [recommendations, setRecommendations] = useState<GapRecommendationList[]>([])
+
   useEffect(() => {
     let cancelled = false
 
-    const fetchAnalytics = async () => {
+    const fetchAll = async () => {
       try {
-        const result = await api.get<AnalyticsPopularity>('/analytics/popularity')
+        const [result, countsData, recs] = await Promise.all([
+          api.get<AnalyticsPopularity>('/analytics/popularity'),
+          dashboardApi.counts().catch(() => null),
+          gapApi.list({ limit: 3 }).catch(() => [] as GapRecommendationList[]),
+        ])
         if (!cancelled) {
           setData(result)
+          setCounts(countsData)
+          setRecommendations(recs)
           setLoadState('ok')
         }
       } catch (err) {
         if (cancelled) return
-
         if (err instanceof ApiError && err.status === 0) {
-          // Backend inaccessible → données mock
           setData(MOCK_ANALYTICS)
           setLoadState('mock')
         } else {
@@ -143,11 +254,20 @@ export function DashboardPage() {
       }
     }
 
-    void fetchAnalytics()
+    void fetchAll()
     return () => { cancelled = true }
   }, [])
 
-  // ── États de chargement / erreur ──
+  const handleApprove = async (id: number) => {
+    try {
+      await gapApi.approve(id)
+      setRecommendations((prev) => prev.filter((r) => r.id !== id))
+    } catch {
+      // Silently fail — user will see error toast in future
+    }
+  }
+
+  // Loading state
   if (loadState === 'loading') {
     return (
       <div className="space-y-4">
@@ -160,6 +280,7 @@ export function DashboardPage() {
     )
   }
 
+  // Error state
   if (loadState === 'error') {
     return (
       <div className="space-y-4">
@@ -177,12 +298,11 @@ export function DashboardPage() {
     )
   }
 
-  // data est garanti non-null ici (loadState = 'ok' | 'mock')
   const analytics = data as AnalyticsPopularity
 
   return (
     <div className="space-y-6">
-      {/* Titre + badge mock */}
+      {/* Header */}
       <div className="flex items-center gap-3">
         <h2 className="text-xl font-semibold">Tableau de bord</h2>
         {loadState === 'mock' && (
@@ -193,26 +313,24 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* Cartes de stats */}
+      {/* Row 1 — Stats cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Cours actifs"
-          value={analytics.total_courses}
-          icon={BookOpen}
-        />
-        <StatCard
-          label="Inscriptions totales"
-          value={analytics.total_enrolled}
-          icon={Users}
-        />
-        <StatCard
-          label="Désistements"
-          value={analytics.total_dropouts}
-          icon={UserMinus}
-        />
+        <StatCard label="Cours actifs" value={analytics.total_courses} icon={BookOpen} />
+        <StatCard label="Inscriptions totales" value={analytics.total_enrolled} icon={Users} />
+        <StatCard label="Désistements" value={analytics.total_dropouts} icon={UserMinus} />
       </div>
 
-      {/* Graphiques popularité */}
+      {/* Row 2 — Hub widgets */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RecommendationsWidget recommendations={recommendations} onApprove={handleApprove} />
+        </div>
+        <div>
+          <OverviewWidget counts={counts} />
+        </div>
+      </div>
+
+      {/* Row 3 — Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <PopularityChart
           title="Cours les plus populaires"

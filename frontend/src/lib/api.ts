@@ -218,12 +218,44 @@ export interface ImportResult {
   filename: string
 }
 
+export interface DashboardCounts {
+  total_schools: number
+  unreviewed_scans: number
+  closure_candidates: number
+  creation_suggestions: number
+}
+
+export interface GapRecommendationList {
+  id: number
+  recommendation_type: 'closure' | 'creation'
+  score: number
+  status: 'draft' | 'approved' | 'rejected' | 'implemented'
+  rationale: string | null
+  created_at: string
+}
+
 export interface AuditLogEntry {
   id: number
   user_id: number | null
   action: string
   target: string | null
   timestamp: string
+}
+
+export const dashboardApi = {
+  counts: () => api.get<DashboardCounts>('/dashboard/counts'),
+}
+
+export const gapApi = {
+  list: (params?: { type?: string; status?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.type) qs.set('type', params.type)
+    if (params?.status) qs.set('status', params.status)
+    if (params?.limit) qs.set('limit', String(params.limit))
+    const query = qs.toString()
+    return api.get<GapRecommendationList[]>(`/gap-recommendations${query ? `?${query}` : ''}`)
+  },
+  approve: (id: number) => api.post<Record<string, unknown>>(`/gap-recommendations/${id}/approve`),
 }
 
 // ── API helpers typés par domaine ─────────────────────────────────────────────
