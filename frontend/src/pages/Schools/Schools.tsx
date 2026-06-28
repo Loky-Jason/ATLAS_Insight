@@ -127,6 +127,9 @@ function SchoolFormDialog({
               >
                 <option value="stub">Démo</option>
                 <option value="SCAP">SCAP</option>
+                <option value="ORSYS">ORSYS</option>
+                <option value="Cegos">Cegos</option>
+                <option value="Demos">Demos</option>
               </select>
             </div>
             <div className="space-y-2">

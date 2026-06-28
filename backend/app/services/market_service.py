@@ -394,7 +394,7 @@ async def run_market_scan(
 
         raw_school = (raw.get("school") or "").lower()
         matched_registry_id = next(
-            (rid for rname, rid in school_registry_map.items() if raw_school and raw_school in rname or rname in raw_school),
+            (rid for rname, rid in school_registry_map.items() if raw_school and (raw_school in rname or rname in raw_school)),
             None,
         )
 
