@@ -1,5 +1,5 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-06-27 — Phases 1b + 1c + UX **livrées et poussées** (`ee117f0`). Scrapers multi-vendeurs (SCAP/Stub/ORSYS/Cegos/Demos). **Backend 256 tests**, **front 65 tests vitest**, builds verts. Prochaine : **Phase 2** (export PDF/Word, archives).
+**Last:** 2026-06-28 — Fix session : 6 issues review résolues, Alembic initialisé, CI verte. Prochaine : **Phase 2** (export PDF/Word, archives).
 
 ## Durcissement revue Phase 1b/1c (2026-06-26)
 - **B1** `gap_service` : recommandations "creation" s'écrasaient toutes en 1 ligne (filtre upsert trop large) → colonne `creation_key` + insertion sans discriminant. Régression `tests/test_gap_service.py`.
@@ -14,8 +14,19 @@
 - `scraper_strategy` défaut = **`stub`** (enregistré ; "html" n'existe pas → 500 sinon).
 - **Prochaine session : Phase 2** — export PDF (WeasyPrint) + Word (python-docx), vue Archives, archivage avancé. Avant : optimiser perf `gap_service` O(n²)+N+1 (chip `task_8aa9a344`, [[project-atlas-gap-perf]]).
 - Fragilité scraping (ponytail, non bloquant) : filtre sitemap `/formation/` hardcodé partagé (orsys+demos) + `<loc>` suivis sans allowlist → durcir au branchement scan réel.
-- Lancer en local : backend `cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000` ; frontend `cd frontend && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin123`.
+- Lancer en local : backend `cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` ; frontend `cd frontend && npm install && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin2026`.
+- Migrations DB : `cd backend && python -m alembic upgrade head` (Alembic initialisé le 28/06, première migration `initial_schema`).
+- PowerShell note : si npm bloqué par execution policy, utiliser `cmd /c "cd frontend && npm run dev"`.
 - Règle process : après chaque sprint front+back, faire un **run d'intégration réel** (serveurs lancés + parcours navigateur) — les sous-agents valident build/pytest, pas le runtime câblé.
+
+## Session 2026-06-28 — Fix review 6 issues
+- **🔴 1** `school_registry_id` absente table SQLite → `ALTER TABLE market_courses` + vérif migration
+- **🟡 2** Reset password admin sans AuditLog → insertion manuelle + commit
+- **🟡 3** Aucune migration DB → **Alembic installé**, env.py async→sync, `initial_schema` stampée
+- **🟡 4** `school_registry_id` jamais propagé dans `market_service.run_market_scan` → lookup SchoolRegistry par nom d'école
+- **🟢 5** Contournement PowerShell non documenté → ajouté à CLAUDE.md
+- **🟢 6** Backend exposé sur `0.0.0.0` → `127.0.0.1` dans CLAUDE.md
+- Backend **256 tests OK**, graph rebuild incrémental (19 nodes, 136 edges)
 
 ## Architecture
 

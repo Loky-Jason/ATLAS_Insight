@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.course import Course
 from app.models.market_course import MarketCourse
+from app.models.school_registry import SchoolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +362,12 @@ async def run_market_scan(
         # Titres déjà en MarketCourse (évite doublons dans la table)
         mc_result = await db.execute(select(MarketCourse.title))
         existing_mc_titles = {r[0].lower() for r in mc_result.all()}
+
+        # School registry lookup (name → id)
+        reg_result = await db.execute(select(SchoolRegistry.id, SchoolRegistry.name))
+        school_registry_map: dict[str, int] = {}
+        for reg_id, reg_name in reg_result.all():
+            school_registry_map[reg_name.lower()] = reg_id
     except Exception as exc:
         logger.error("Erreur DB lors du chargement données SCAP : %s", exc)
         raise
@@ -385,9 +392,16 @@ async def run_market_scan(
 
         why = " ".join(why_parts) + f" (score: {relevance})"
 
+        raw_school = (raw.get("school") or "").lower()
+        matched_registry_id = next(
+            (rid for rname, rid in school_registry_map.items() if raw_school and raw_school in rname or rname in raw_school),
+            None,
+        )
+
         mc = MarketCourse(
             title=raw["title"],
             school=raw.get("school"),
+            school_registry_id=matched_registry_id,
             source_url=raw.get("source_url"),
             summary=raw.get("summary"),
             relevance_score=relevance,
@@ -401,6 +415,7 @@ async def run_market_scan(
             {
                 "title": raw["title"],
                 "school": raw.get("school"),
+                "school_registry_id": matched_registry_id,
                 "source_url": raw.get("source_url"),
                 "relevance_score": relevance,
                 "why_it_works": why,

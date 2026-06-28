@@ -27,13 +27,15 @@ Dashboard décisionnel pédagogique SCAP.paris. Voir `docs/SPEC.md` (source de v
 ```
 # backend
 cd backend && python -m venv .venv && .venv\Scripts\activate && pip install -e .
-uvicorn app.main:app --reload
-# frontend
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+# frontend (si npm échoue pour cause de execution policy PowerShell)
+#   → utiliser cmd /c "cd frontend && npm run dev"
 cd frontend && npm install && npm run dev
+
 # tests
 cd backend && python -m pytest -v
-# lint/typecheck frontend
-cd frontend && npm run lint && npm run typecheck
+cd backend && python -m alembic upgrade head   # migrations DB
+cd backend && python -m alembic current        # état migration
 ```
 
 ## Workflow
