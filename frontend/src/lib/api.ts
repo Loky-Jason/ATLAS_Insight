@@ -3,7 +3,7 @@
 
 /// <reference types="vite/client" />
 
-const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://localhost:8000/api/v1'
+const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8000/api/v1'
 
 // ── Types génériques ──────────────────────────────────────────────────────────
 
@@ -18,6 +18,16 @@ export class ApiError extends Error {
 }
 
 // ── Requête de base ───────────────────────────────────────────────────────────
+
+let onUnauthorized: (() => void) | null = null
+
+/**
+ * Permet au AuthProvider d'enregistrer une action à exécuter sur 401.
+ * Cela évite l'état incohérent "user affiché mais données non chargées".
+ */
+export function setOnUnauthorized(callback: () => void): void {
+  onUnauthorized = callback
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${path}`
@@ -39,6 +49,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && onUnauthorized) {
+      onUnauthorized()
+    }
     let message = `Erreur ${response.status}`
     try {
       const body = (await response.json()) as { detail?: string }

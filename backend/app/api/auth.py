@@ -28,7 +28,7 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 _COOKIE_KWARGS = {
     "key": COOKIE_NAME,
     "httponly": True,
-    "samesite": "strict",
+    "samesite": "lax",  # Lax fonctionne pour les SPA en dev (127.0.0.1:5173 → 127.0.0.1:8000)
     "secure": settings.is_production,  # True en HTTPS production uniquement
 }
 

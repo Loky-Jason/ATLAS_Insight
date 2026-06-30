@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, ApiError, type User } from './api'
+import { api, ApiError, setOnUnauthorized, type User } from './api'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void checkSession()
     return () => { cancelled = true }
+  }, [])
+
+  // Déclencheur global : n'importe quelle requête API 401 déconnecte l'utilisateur.
+  useEffect(() => {
+    setOnUnauthorized(() => setUser(null))
   }, [])
 
   const login = useCallback(async ({ email, password }: LoginCredentials) => {
