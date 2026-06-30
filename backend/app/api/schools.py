@@ -20,6 +20,7 @@ from app.schemas.school_registry import (
     SchoolRegistryRead,
     SchoolRegistryUpdate,
 )
+from app.scrapers import list_scrapers
 from app.services import scanner_service
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,18 @@ async def list_schools(
         return list(result.scalars().all())
     except Exception as exc:
         logger.error("Erreur DB list_schools : %s", exc)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+
+
+@router.get("/strategies", response_model=list[str])
+async def list_scraper_strategies(
+    _: User = Depends(get_current_user),
+) -> list[str]:
+    """Lister les stratégies de scraper disponibles (alimenté par @register_scraper)."""
+    try:
+        return sorted(list_scrapers())
+    except Exception as exc:
+        logger.error("Erreur list_scraper_strategies : %s", exc)
         raise HTTPException(status_code=500, detail="Erreur serveur.")
 
 

@@ -59,11 +59,13 @@ function SchoolFormDialog({
   open,
   onOpenChange,
   school,
+  strategies,
   onSave,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   school: SchoolRegistry | null
+  strategies: string[]
   onSave: (data: SchoolRegistryCreate) => Promise<void>
 }) {
   const [form, setForm] = useState<SchoolRegistryCreate>(emptyForm)
@@ -125,11 +127,11 @@ function SchoolFormDialog({
                 onChange={(e) => setForm({ ...form, scraper_strategy: e.target.value })}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="stub">Démo</option>
-                <option value="SCAP">SCAP</option>
-                <option value="ORSYS">ORSYS</option>
-                <option value="Cegos">Cegos</option>
-                <option value="Demos">Demos</option>
+                {strategies.map((s) => (
+                  <option key={s} value={s}>
+                    {s === 'stub' ? 'Démo' : s}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
@@ -272,6 +274,7 @@ export function SchoolsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [schools, setSchools] = useState<SchoolRegistry[]>([])
+  const [strategies, setStrategies] = useState<string[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -296,6 +299,10 @@ export function SchoolsPage() {
 
   useEffect(() => {
     void fetchSchools()
+    schoolsApi
+      .listStrategies()
+      .then(setStrategies)
+      .catch(() => setStrategies([]))
   }, [])
 
   const filtered = search
@@ -497,7 +504,7 @@ export function SchoolsPage() {
         </Card>
       )}
 
-      <SchoolFormDialog open={dialogOpen} onOpenChange={setDialogOpen} school={editingSchool} onSave={handleSave} />
+      <SchoolFormDialog open={dialogOpen} onOpenChange={setDialogOpen} school={editingSchool} strategies={strategies} onSave={handleSave} />
       <DiffDialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen} school={diffSchool} />
     </div>
   )

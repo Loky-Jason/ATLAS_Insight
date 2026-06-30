@@ -399,6 +399,7 @@ export const schoolsApi = {
     const qs = params?.active !== undefined ? `?active=${params.active}` : ''
     return api.get<SchoolRegistry[]>(`/schools${qs}`)
   },
+  listStrategies: () => api.get<string[]>('/schools/strategies'),
   get: (id: number) => api.get<SchoolRegistry>(`/schools/${id}`),
   create: (payload: SchoolRegistryCreate) => api.post<SchoolRegistry>('/schools', payload),
   update: (id: number, payload: SchoolRegistryUpdate) =>

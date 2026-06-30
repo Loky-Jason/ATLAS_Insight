@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -27,6 +28,20 @@ engine = create_async_engine(
     connect_args={"check_same_thread": False},
 )
 
+
+# Per-connection PRAGMAs (must run on every new connection from the pool).
+# busy_timeout avoids SQLITE_BUSY during long concurrent scans.
+# foreign_keys enables FK constraints (off by default in SQLite).
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection, _connection_record):
+    cur = dbapi_connection.cursor()
+    try:
+        cur.execute("PRAGMA busy_timeout=30000")
+        cur.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cur.close()
+
+
 SessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -43,12 +58,15 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     """Create all tables. Called at application startup."""
     try:
-        async with engine.begin() as conn:
-            # Import models so they register on Base.metadata
-            import app.models  # noqa: F401  # side-effect import
+        # Side-effect import: registers all model classes on Base.metadata.
+        import app.models  # noqa: F401
 
+        async with engine.begin() as conn:
+            # File-level PRAGMAs (persistent in the DB file, applied once).
+            await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+            await conn.exec_driver_sql("PRAGMA synchronous=NORMAL")
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("Tables créées / vérifiées avec succès.")
+        logger.info("Tables créées / vérifiées avec succès (WAL activé).")
     except Exception as exc:
         logger.error("Erreur lors de la création des tables : %s", exc)
         raise
