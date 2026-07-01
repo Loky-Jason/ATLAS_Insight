@@ -46,8 +46,9 @@ def list_scrapers() -> list[str]:
 class BaseScraperAdapter(ABC):
     MAX_COURSES: int | None = None
 
-    def __init__(self, school_registry_id: int) -> None:
+    def __init__(self, school_registry_id: int, config: dict | None = None) -> None:
         self.school_registry_id = school_registry_id
+        self.config = config or {}
         self._http = httpx.Client()
         self._http.headers.update({"User-Agent": "ATLAS-Insight/1.0"})
 

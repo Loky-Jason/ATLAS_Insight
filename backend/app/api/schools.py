@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from app.schemas.school_registry import (
     SchoolRegistryList,
     SchoolRegistryRead,
     SchoolRegistryUpdate,
+    TestConnectionRequest,
 )
 from app.scrapers import list_scrapers
 from app.services import scanner_service
@@ -150,6 +152,28 @@ async def delete_school(
         raise HTTPException(status_code=500, detail="Erreur lors de la suppression.")
     logger.info("École %s supprimée par user %s.", school.name, current_user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/test-connection")
+async def test_connection(
+    payload: TestConnectionRequest,
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Tester la connexion à l'URL configurée (admin)."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
+            resp = await client.get(payload.url)
+            resp.raise_for_status()
+            return {"success": True}
+    except httpx.TimeoutException:
+        return {"success": False, "error_msg": "La connexion a expiré (10s)."}
+    except httpx.HTTPStatusError as exc:
+        return {"success": False, "error_msg": f"Erreur HTTP {exc.response.status_code}."}
+    except httpx.RequestError as exc:
+        return {"success": False, "error_msg": f"Impossible de se connecter : {exc}"}
+    except Exception as exc:
+        logger.error("Erreur test_connection : %s", exc)
+        return {"success": False, "error_msg": "Erreur inattendue lors du test."}
 
 
 @router.post("/{school_id}/scan")

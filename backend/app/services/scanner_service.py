@@ -97,7 +97,8 @@ async def run_school_scan(
         raise ValueError(f"SchoolRegistry #{school_registry_id} introuvable")
 
     scraper_cls = get_scraper(school.scraper_strategy)
-    scraper = scraper_cls(school_registry_id=school.id)
+    config = {**(school.config or {}), "_school_url": school.url}
+    scraper = scraper_cls(school_registry_id=school.id, config=config)
 
     scan_run = MarketScanRun(
         school_registry_id=school.id,
@@ -126,6 +127,7 @@ async def run_school_scan(
             "modified": 0,
             "removed": 0,
             "scan_run_id": scan_run.id,
+            "error_msg": str(exc)[:1024],
         }
 
     # Existing active courses indexées par external_id

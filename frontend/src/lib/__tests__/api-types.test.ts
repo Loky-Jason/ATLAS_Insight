@@ -83,6 +83,7 @@ describe('SchoolRegistry type', () => {
       active: true,
       scan_interval: 1440,
       last_scanned_at: null,
+      config: null,
       created_at: '2026-06-01T00:00:00Z',
     }
     expect(school.name).toBe('École de test')
@@ -98,6 +99,7 @@ describe('SchoolRegistry type', () => {
       active: false,
       scan_interval: 60,
       last_scanned_at: null,
+      config: null,
       created_at: '2026-06-15T00:00:00Z',
     }
     expect(school.last_scanned_at).toBeNull()
@@ -112,6 +114,7 @@ describe('SchoolRegistry type', () => {
       active: true,
       scan_interval: 1440,
       last_scanned_at: '2026-06-27T12:00:00Z',
+      config: { mode: 'sitemap', sitemap_url: 'auto' },
       created_at: '2026-06-01T00:00:00Z',
     }
     expect(school.last_scanned_at).toBe('2026-06-27T12:00:00Z')

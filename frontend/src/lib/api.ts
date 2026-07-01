@@ -3,7 +3,7 @@
 
 /// <reference types="vite/client" />
 
-const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8000/api/v1'
+const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://localhost:8000/api/v1'
 
 // ── Types génériques ──────────────────────────────────────────────────────────
 
@@ -323,6 +323,7 @@ export interface SchoolRegistry {
   active: boolean
   scan_interval: number
   last_scanned_at: string | null
+  config: Record<string, unknown> | null
   created_at: string
 }
 
@@ -332,6 +333,7 @@ export interface SchoolRegistryCreate {
   scraper_strategy?: string
   active?: boolean
   scan_interval?: number
+  config?: Record<string, unknown> | null
 }
 
 export interface SchoolRegistryUpdate {
@@ -340,6 +342,7 @@ export interface SchoolRegistryUpdate {
   scraper_strategy?: string
   active?: boolean
   scan_interval?: number
+  config?: Record<string, unknown> | null
 }
 
 export interface SchoolCourse {
@@ -419,8 +422,10 @@ export const schoolsApi = {
     api.patch<SchoolRegistry>(`/schools/${id}`, payload),
   delete: (id: number) => api.delete<void>(`/schools/${id}`),
   scan: (id: number) =>
-    api.post<{ school_name: string; status: string; found: number; new: number; modified: number; removed: number; scan_run_id: number }>(`/schools/${id}/scan`),
+    api.post<{ school_name: string; status: string; found: number; new: number; modified: number; removed: number; scan_run_id: number; error_msg: string | null }>(`/schools/${id}/scan`),
   diff: (id: number) => api.get<ScanDiff>(`/schools/${id}/diff`),
+  testConnection: (url: string) =>
+    api.post<{ success: boolean; error_msg?: string }>('/schools/test-connection', { url }),
 }
 
 export const schoolCoursesApi = {

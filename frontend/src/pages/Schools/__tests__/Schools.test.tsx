@@ -19,6 +19,8 @@ const mockUpdate = vi.hoisted(() => vi.fn())
 const mockDelete = vi.hoisted(() => vi.fn())
 const mockScan = vi.hoisted(() => vi.fn())
 const mockDiff = vi.hoisted(() => vi.fn())
+const mockTestConnection = vi.hoisted(() => vi.fn().mockResolvedValue({ success: true }))
+const mockListStrategies = vi.hoisted(() => vi.fn().mockResolvedValue([]))
 
 // L'ApiError du module réel est conservé via importActual
 vi.mock('@/lib/api', async () => {
@@ -27,11 +29,13 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     schoolsApi: {
       list: mockList,
+      listStrategies: mockListStrategies,
       create: mockCreate,
       update: mockUpdate,
       delete: mockDelete,
       scan: mockScan,
       diff: mockDiff,
+      testConnection: mockTestConnection,
     },
   }
 })
@@ -137,8 +141,8 @@ describe('SchoolsPage', () => {
     expect(screen.getByText('École B')).toBeInTheDocument()
   })
 
-  // ── Error banner shows and can be dismissed ────────────────────────────────
-  it('shows and dismisses error banner on scan failure', async () => {
+  // ── Error banner shows and scan message can be dismissed ───────────────────
+  it('shows error banner on scan API failure and dismisses scan message', async () => {
     mockList.mockResolvedValue(mockSchools)
     mockScan.mockRejectedValue(new ApiError(500, 'Scan failed'))
 
@@ -152,21 +156,99 @@ describe('SchoolsPage', () => {
     const scanButtons = screen.getAllByTitle('Lancer un scan')
     fireEvent.click(scanButtons[0]!)
 
-    // Wait for error banner
+    // Wait for error banner (scanMsg area + errorMsg fallback both show the text)
     await waitFor(() => {
       expect(screen.getByText('Scan failed')).toBeInTheDocument()
     })
 
-    // Dismiss error banner
-    fireEvent.click(screen.getByText('Fermer'))
+    // Dismiss scan message — errorMsg fallback card remains visible
+    const closeButtons = screen.getAllByText('Fermer')
+    fireEvent.click(closeButtons[0]!)
+
+    // scanMsg card is gone, but errorMsg card still shows "Scan failed"
     await waitFor(() => {
-      expect(screen.queryByText('Scan failed')).not.toBeInTheDocument()
+      // Only one "Scan failed" text visible now (from errorMsg, not scanMsg)
+      const items = screen.getAllByText('Scan failed')
+      expect(items.length).toBe(1)
+    })
+  })
+
+  // ── Scan error_msg from status: 'error' response ──────────────────────────
+  it('shows error feedback when scan returns status "error"', async () => {
+    mockList.mockResolvedValue(mockSchools)
+    mockScan.mockResolvedValue({
+      school_name: 'École A',
+      status: 'error',
+      found: 0,
+      new: 0,
+      modified: 0,
+      removed: 0,
+      scan_run_id: 42,
+      error_msg: 'La connexion au site a échoué',
+    })
+
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('École A')).toBeInTheDocument()
+    })
+
+    // Click scan button
+    const scanButtons = screen.getAllByTitle('Lancer un scan')
+    fireEvent.click(scanButtons[0]!)
+
+    // Wait for error message from scan response
+    await waitFor(() => {
+      expect(
+        screen.getByText('La connexion au site a échoué')
+      ).toBeInTheDocument()
+    })
+
+    // The scanMsg card should have destructive styling (red border)
+    const scanCard = screen.getByText('La connexion au site a échoué').closest('.border-destructive\\/50')
+    expect(scanCard).not.toBeNull()
+
+    // Verify it's in scan message area, not errorMsg area
+    expect(screen.queryByText('Échec du scan')).toBeNull()
+  })
+
+  it('shows fallback error text when error_msg is null', async () => {
+    mockList.mockResolvedValue(mockSchools)
+    mockScan.mockResolvedValue({
+      school_name: 'École A',
+      status: 'error',
+      found: 0,
+      new: 0,
+      modified: 0,
+      removed: 0,
+      scan_run_id: 43,
+      error_msg: null,
+    })
+
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('École A')).toBeInTheDocument()
+    })
+
+    const scanButtons = screen.getAllByTitle('Lancer un scan')
+    fireEvent.click(scanButtons[0]!)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Échec du scan')
+      ).toBeInTheDocument()
     })
   })
 })
 
 // ── SchoolFormDialog tests ───────────────────────────────────────────────────
 describe('SchoolFormDialog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTestConnection.mockResolvedValue({ success: true })
+  })
+
   it('opens create dialog when "Ajouter une école" is clicked', async () => {
     mockList.mockResolvedValue([])
     render(<SchoolsPage />)
@@ -227,6 +309,103 @@ describe('SchoolFormDialog', () => {
           url: 'https://nouvelle.example.com',
         })
       )
+    })
+  })
+
+  it('shows error in dialog when test-connection fails and keeps dialog open', async () => {
+    mockTestConnection.mockResolvedValueOnce({ success: false, error_msg: 'Erreur HTTP 503.' })
+    mockList.mockResolvedValue([])
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Aucune école configurée')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Ajouter une école'))
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Site KO' } })
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://ko.example.com' } })
+    fireEvent.click(screen.getByText('Ajouter'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Erreur HTTP 503.')).toBeInTheDocument()
+    })
+
+    // Dialog toujours ouvert (le bouton submit est visible), onSave jamais appelé
+    expect(screen.getByRole('button', { name: /Ajouter$/i })).toBeInTheDocument()
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('shows error in dialog when testConnection throws ApiError', async () => {
+    mockTestConnection.mockRejectedValue(new ApiError(0, 'Le serveur est inaccessible.'))
+    mockList.mockResolvedValue([])
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Aucune école configurée')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Ajouter une école'))
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Site KO' } })
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://ko.example.com' } })
+    fireEvent.click(screen.getByText('Ajouter'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Le serveur est inaccessible.')).toBeInTheDocument()
+    })
+
+    // Dialog stays open, onSave never called
+    expect(screen.getByRole('button', { name: /Ajouter$/i })).toBeInTheDocument()
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('shows fallback error message when error_msg is empty', async () => {
+    mockTestConnection.mockResolvedValueOnce({ success: false }) // no error_msg
+    mockList.mockResolvedValue([])
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Aucune école configurée')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Ajouter une école'))
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Site KO' } })
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://ko.example.com' } })
+    fireEvent.click(screen.getByText('Ajouter'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Connexion échouée.')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('button', { name: /Ajouter$/i })).toBeInTheDocument()
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('calls onSave and closes dialog when test-connection succeeds', async () => {
+    mockTestConnection.mockResolvedValue({ success: true })
+    mockCreate.mockResolvedValue(mockSchools[0]!)
+    mockList.mockResolvedValue([])
+    render(<SchoolsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Aucune école configurée')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Ajouter une école'))
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Nouvelle École' } })
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://nouvelle.example.com' } })
+    fireEvent.click(screen.getByText('Ajouter'))
+
+    // testConnection called with the right URL
+    await waitFor(() => {
+      expect(mockTestConnection).toHaveBeenCalledWith('https://nouvelle.example.com')
+    })
+    // Then onSave is called (create)
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled()
+    })
+    // Dialog closes
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
 })

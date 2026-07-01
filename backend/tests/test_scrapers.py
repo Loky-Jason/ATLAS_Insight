@@ -12,6 +12,7 @@ from app.scrapers import (
     BaseScraperAdapter,
     CegosScraperAdapter,
     DemosScraperAdapter,
+    GenericScraperAdapter,
     NormalisedCourse,
     ORSYSScraperAdapter,
     get_scraper,
@@ -1234,3 +1235,410 @@ class TestAdapterConstruction:
             assert hasattr(adapter, "_http")
         # After context exit, client should be closed
         assert adapter._http is not None
+
+
+class TestGenericScraperAdapter:
+    """GenericScraperAdapter — JSON-LD + sélecteurs CSS + helpers."""
+
+    def test_construction(self):
+        adapter = GenericScraperAdapter(school_registry_id=1)
+        assert adapter.school_registry_id == 1
+        assert adapter.config == {}
+        adapter.close()
+
+    def test_construction_with_config(self):
+        cfg = {"mode": "sitemap", "sitemap_url": "https://example.com/sitemap.xml"}
+        adapter = GenericScraperAdapter(school_registry_id=2, config=cfg)
+        assert adapter.config == cfg
+        adapter.close()
+
+    def test_extract_title_fallback_h1(self):
+        html = "<html><body><h1>Formation Python</h1></body></html>"
+        result = GenericScraperAdapter._extract_title_fallback(html)
+        assert result == "Formation Python"
+
+    def test_extract_title_fallback_og(self):
+        html = '<html><head><meta property="og:title" content="OG Title"></head></html>'
+        result = GenericScraperAdapter._extract_title_fallback(html)
+        assert result == "OG Title"
+
+    def test_extract_title_fallback_none(self):
+        assert GenericScraperAdapter._extract_title_fallback("<html></html>") is None
+
+    def test_apply_selector_text(self):
+        html = '<div class="price">1 234 €</div>'
+        result = GenericScraperAdapter._apply_selector(html, ".price")
+        assert result == "1 234 €"
+
+    def test_apply_selector_attr(self):
+        html = '<meta name="description" content="Super cours">'
+        result = GenericScraperAdapter._apply_selector(html, "meta[name=description]::attr(content)")
+        assert result == "Super cours"
+
+    def test_apply_selector_no_match(self):
+        html = "<html></html>"
+        assert GenericScraperAdapter._apply_selector(html, ".nonexistent") is None
+
+    def test_normalize_duration_hours(self):
+        assert GenericScraperAdapter._normalize_duration("14h") == 14.0
+        assert GenericScraperAdapter._normalize_duration("3.5 h") == 3.5
+
+    def test_normalize_duration_days(self):
+        assert GenericScraperAdapter._normalize_duration("2 jours") == 14.0
+
+    def test_normalize_duration_none(self):
+        assert GenericScraperAdapter._normalize_duration(None) is None
+
+    def test_normalize_duration_float(self):
+        assert GenericScraperAdapter._normalize_duration(21.0) == 21.0
+
+    def test_normalize_price_float(self):
+        assert GenericScraperAdapter._normalize_price(1290.0) == 1290.0
+
+    def test_normalize_price_string(self):
+        assert GenericScraperAdapter._normalize_price("1 234 €") == 1234.0
+        assert GenericScraperAdapter._normalize_price("1 234,56 €") == 1234.56
+
+    def test_normalize_price_none(self):
+        assert GenericScraperAdapter._normalize_price(None) is None
+
+    def test_extract_jsonld_valid_course(self):
+        """JSON-LD avec @type=Course est extrait correctement."""
+        result = GenericScraperAdapter._normalize_jsonld(
+            {"@type": "Course", "name": "Formation Test", "description": "Desc", "timeRequired": "P3.5H"}
+        )
+        assert result["title"] == "Formation Test"
+        assert result["description"] == "Desc"
+        assert result["duration_hours"] == "P3.5H"
+
+    def test_extract_jsonld_no_script(self):
+        assert GenericScraperAdapter._extract_jsonld("<html></html>") is None
+
+    def test_normalize_jsonld_offers_as_array(self):
+        item = {
+            "@type": "Course",
+            "name": "Test Array Offers",
+            "offers": [{"price": 1290.0}],
+            "about": [{"name": "Développement"}],
+        }
+        result = GenericScraperAdapter._normalize_jsonld(item)
+        assert result["price"] == 1290.0
+        assert result["category"] == "Développement"
+
+    def test_normalize_jsonld_with_offers_and_about(self):
+        item = {
+            "@type": "Course",
+            "name": "Cours Pro",
+            "description": "Desc pro",
+            "timeRequired": "P10H",
+            "offers": {"price": 500.0},
+            "about": {"name": "Développement"},
+            "courseMode": "en ligne",
+            "educationalCredentialAwarded": "Certification Pro",
+        }
+        result = GenericScraperAdapter._normalize_jsonld(item)
+        assert result["title"] == "Cours Pro"
+        assert result["price"] == 500.0
+        assert result["category"] == "Développement"
+        assert result["format"] == "en ligne"
+        assert result["certification"] == "Certification Pro"
+
+    # ------------------------------------------------------------------
+    # Integration tests — _scrape_page
+    # ------------------------------------------------------------------
+
+    def test_scrape_page_jsonld_only(self) -> None:
+        """_scrape_page extrait depuis JSON-LD quand use_jsonld=True."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {"use_jsonld": True}
+        html = """\
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "Python avanc\u00e9",
+  "description": "Ma\u00eetrisez le langage Python.",
+  "timeRequired": "PT35H",
+  "offers": {"price": 1250.0},
+  "about": {"name": "Informatique"},
+  "courseMode": "presentiel",
+  "educationalCredentialAwarded": "Certification Python"
+}
+</script>
+</head><body></body></html>"""
+        adapter._http.get.return_value = _mock_response(html)
+        course = adapter._scrape_page(
+            "https://example.com/course/python-avance",
+            use_jsonld=True,
+            cfg=adapter.config,
+        )
+        assert course is not None
+        assert course["title"] == "Python avanc\u00e9"
+        assert course["description"] == "Ma\u00eetrisez le langage Python."
+        assert course["duration_hours"] == 35.0
+        assert course["price"] == 1250.0
+        assert course["category"] == "Informatique"
+        assert course["format"] == "presentiel"
+        assert course["certification"] == "Certification Python"
+        assert course["external_id"] == "python-avance"
+        assert course["url"] == "https://example.com/course/python-avance"
+
+    def test_scrape_page_css_selectors_only(self) -> None:
+        """_scrape_page extrait depuis les s\u00e9lecteurs CSS quand use_jsonld=False."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {
+            "use_jsonld": False,
+            "selectors": {
+                "title": "h1",
+                "description": "meta[name=description]::attr(content)",
+                "duration_hours": ".duration",
+                "price": ".price",
+                "category": ".category",
+                "format": ".format",
+                "certification": ".certification",
+            },
+        }
+        html = """\
+<html><head>
+<meta name="description" content="Description depuis meta.">
+</head><body>
+<h1>Formation Excel d\u00e9butant</h1>
+<div class="duration">21 h</div>
+<div class="price">850 \u20ac</div>
+<div class="category">Bureautique</div>
+<div class="format">distanciel</div>
+<div class="certification">Certification Excel</div>
+</body></html>"""
+        adapter._http.get.return_value = _mock_response(html)
+        course = adapter._scrape_page(
+            "https://example.com/course/excel-debutant",
+            use_jsonld=False,
+            cfg=adapter.config,
+        )
+        assert course is not None
+        assert course["title"] == "Formation Excel d\u00e9butant"
+        assert course["description"] == "Description depuis meta."
+        assert course["duration_hours"] == 21.0
+        assert course["price"] == 850.0
+        assert course["category"] == "Bureautique"
+        assert course["format"] == "distanciel"
+        assert course["certification"] == "Certification Excel"
+
+    def test_scrape_page_jsonld_with_css_fallback(self) -> None:
+        """Les champs manquants dans JSON-LD sont compl\u00e9t\u00e9s par les s\u00e9lecteurs CSS."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {
+            "use_jsonld": True,
+            "selectors": {
+                "duration_hours": ".duration",
+            },
+        }
+        html = """\
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "Formation Data Science",
+  "description": "Analyse de donn\u00e9es avec Python.",
+  "offers": {"price": 2000.0}
+}
+</script>
+</head><body>
+<div class="duration">5 jours</div>
+</body></html>"""
+        adapter._http.get.return_value = _mock_response(html)
+        course = adapter._scrape_page(
+            "https://example.com/course/data-science",
+            use_jsonld=True,
+            cfg=adapter.config,
+        )
+        assert course is not None
+        # Ces champs viennent du JSON-LD
+        assert course["title"] == "Formation Data Science"
+        assert course["description"] == "Analyse de donn\u00e9es avec Python."
+        assert course["price"] == 2000.0
+        # La dur\u00e9e vient du s\u00e9lecteur CSS (fallback)
+        assert course["duration_hours"] == 35.0  # 5 jours * 7
+
+    def test_scrape_page_missing_title_returns_none(self) -> None:
+        """_scrape_page retourne None quand aucun titre n'est trouv\u00e9."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {"use_jsonld": False}
+        html = """\
+<html><head></head><body>
+<p>Contenu sans titre.</p>
+</body></html>"""
+        adapter._http.get.return_value = _mock_response(html)
+        course = adapter._scrape_page(
+            "https://example.com/course/sans-titre",
+            use_jsonld=False,
+            cfg=adapter.config,
+        )
+        assert course is None
+
+    def test_scrape_page_price_with_offers_array(self) -> None:
+        """Prix extrait correctement quand offers est un tableau dans JSON-LD."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {"use_jsonld": True}
+        html = """\
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "Formation avec tarifs multiples",
+  "description": "Un cours avec plusieurs offres.",
+  "timeRequired": "PT14H",
+  "offers": [
+    {"price": 1290.0, "priceCurrency": "EUR"},
+    {"price": 990.0, "priceCurrency": "EUR"}
+  ],
+  "about": {"name": "D\u00e9veloppement"}
+}
+</script>
+</head><body></body></html>"""
+        adapter._http.get.return_value = _mock_response(html)
+        course = adapter._scrape_page(
+            "https://example.com/course/multi-tarifs",
+            use_jsonld=True,
+            cfg=adapter.config,
+        )
+        assert course is not None
+        assert course["price"] == 1290.0
+        assert course["title"] == "Formation avec tarifs multiples"
+        assert course["duration_hours"] == 14.0
+
+    # ------------------------------------------------------------------
+    # Integration tests — fetch_all_courses
+    # ------------------------------------------------------------------
+
+    def test_fetch_all_courses_sitemap_mode(self) -> None:
+        """fetch_all_courses en mode sitemap retourne tous les cours."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {
+            "mode": "sitemap",
+            "sitemap_url": "https://example.com/sitemap.xml",
+            "url_pattern": "",
+            "use_jsonld": False,
+            "selectors": {"title": "h1"},
+        }
+        sitemap_xml = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/course/python</loc></url>
+  <url><loc>https://example.com/course/excel</loc></url>
+</urlset>"""
+        course_html = """\
+<html><body><h1>Formation Test</h1></body></html>"""
+
+        def _side_effect(url: str, **kw: object) -> MagicMock:
+            if "sitemap" in url:
+                return _mock_response(sitemap_xml)
+            return _mock_response(course_html)
+
+        adapter._http.get.side_effect = _side_effect
+        results = adapter.fetch_all_courses()
+        assert len(results) == 2
+        for c in results:
+            assert c["title"] == "Formation Test"
+
+    def test_fetch_all_courses_max_courses_limit(self) -> None:
+        """fetch_all_courses respecte max_courses."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {
+            "mode": "sitemap",
+            "sitemap_url": "https://example.com/sitemap.xml",
+            "url_pattern": "",
+            "max_courses": 1,
+            "use_jsonld": False,
+            "selectors": {"title": "h1"},
+        }
+        sitemap_xml = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/course/python</loc></url>
+  <url><loc>https://example.com/course/excel</loc></url>
+  <url><loc>https://example.com/course/data</loc></url>
+</urlset>"""
+        course_html = """\
+<html><body><h1>Formation Limit\u00e9e</h1></body></html>"""
+
+        def _side_effect(url: str, **kw: object) -> MagicMock:
+            if "sitemap" in url:
+                return _mock_response(sitemap_xml)
+            return _mock_response(course_html)
+
+        adapter._http.get.side_effect = _side_effect
+        results = adapter.fetch_all_courses()
+        assert len(results) == 1
+
+    def test_fetch_all_courses_list_mode(self) -> None:
+        """fetch_all_courses en mode list extrait les cours depuis une page liste."""
+        adapter = _make_adapter(GenericScraperAdapter)
+        adapter.config = {
+            "mode": "list",
+            "list_url": "https://example.com/formations",
+            "course_link_selector": "a.card",
+            "use_jsonld": False,
+            "selectors": {"title": "h1"},
+        }
+        list_html = """\
+<html><body>
+<a class="card" href="/course/python">Python</a>
+<a class="card" href="/course/excel">Excel</a>
+<a class="card" href="/course/data">Data Science</a>
+</body></html>"""
+        course_html = """\
+<html><body><h1>Cours de test</h1></body></html>"""
+
+        def _side_effect(url: str, **kw: object) -> MagicMock:
+            if "formations" in url:
+                return _mock_response(list_html)
+            return _mock_response(course_html)
+
+        adapter._http.get.side_effect = _side_effect
+        results = adapter.fetch_all_courses()
+        assert len(results) == 3
+        for c in results:
+            assert c["title"] == "Cours de test"
+
+    # ------------------------------------------------------------------
+    # Tests — _resolve_sitemap_url
+    # ------------------------------------------------------------------
+
+    def test_resolve_sitemap_url_explicit(self) -> None:
+        """URL explicite retourn\u00e9e directement (pas de requ\u00eate HTTP)."""
+        adapter = GenericScraperAdapter(school_registry_id=1)
+        adapter.config = {"sitemap_url": "https://example.com/sitemap.xml"}
+        result = adapter._resolve_sitemap_url(adapter.config)
+        assert result == "https://example.com/sitemap.xml"
+
+    def test_resolve_sitemap_url_auto_discovery(self) -> None:
+        """Auto-d\u00e9tection trouve le sitemap via HEAD /sitemap.xml."""
+        adapter = GenericScraperAdapter(school_registry_id=1)
+        adapter.config = {
+            "sitemap_url": "auto",
+            "_school_url": "https://example.com/",
+        }
+        adapter._http = MagicMock()
+        adapter._http.head.return_value = _mock_response(status_code=200)
+        result = adapter._resolve_sitemap_url(adapter.config)
+        assert result == "https://example.com/sitemap.xml"
+        adapter._http.head.assert_called_once()
+        url_arg = adapter._http.head.call_args[0][0]
+        assert "sitemap.xml" in url_arg
+
+    def test_resolve_sitemap_url_auto_discovery_fallback(self) -> None:
+        """Auto-d\u00e9tection \u00e9choue (404) \u2192 fallback vers /sitemap.xml."""
+        adapter = GenericScraperAdapter(school_registry_id=1)
+        adapter.config = {
+            "sitemap_url": "auto",
+            "_school_url": "https://example.com/",
+        }
+        adapter._http = MagicMock()
+        adapter._http.head.return_value = _mock_response(status_code=404)
+        result = adapter._resolve_sitemap_url(adapter.config)
+        assert result == "https://example.com/sitemap.xml"
+        assert adapter._http.head.call_count == 2  # les 2 chemins tent\u00e9s

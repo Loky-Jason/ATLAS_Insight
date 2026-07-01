@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Play, Eye, Search, GraduationCap, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Play, Eye, Search, GraduationCap, AlertTriangle, CheckCircle2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { schoolsApi, type SchoolRegistry, type SchoolRegistryCreate, type ScanDiff } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -26,6 +26,34 @@ const emptyForm: SchoolRegistryCreate = {
   scraper_strategy: 'stub',
   active: true,
   scan_interval: 1440,
+}
+
+interface ScraperConfig {
+  mode: 'sitemap' | 'list'
+  sitemap_url: string
+  url_pattern: string
+  list_url: string
+  course_link_selector: string
+  use_jsonld: boolean
+  selectors: Record<string, string>
+}
+
+const emptyConfig: ScraperConfig = {
+  mode: 'sitemap',
+  sitemap_url: 'auto',
+  url_pattern: '/formation/',
+  list_url: '',
+  course_link_selector: 'a',
+  use_jsonld: true,
+  selectors: {
+    title: '',
+    description: '',
+    duration: '',
+    price: '',
+    category: '',
+    format: '',
+    certification: '',
+  },
 }
 
 function StrategyBadge({ strategy }: { strategy: string }) {
@@ -69,30 +97,64 @@ function SchoolFormDialog({
   onSave: (data: SchoolRegistryCreate) => Promise<void>
 }) {
   const [form, setForm] = useState<SchoolRegistryCreate>(emptyForm)
+  const [cfg, setCfg] = useState<ScraperConfig>(emptyConfig)
   const [saving, setSaving] = useState(false)
+  const [showSelectors, setShowSelectors] = useState(false)
+  const [connError, setConnError] = useState<string | null>(null)
+
+  const isGeneric = form.scraper_strategy === 'generic'
 
   useEffect(() => {
     if (open) {
-      setForm(
-        school
-          ? {
-              name: school.name,
-              url: school.url,
-              scraper_strategy: school.scraper_strategy,
-              active: school.active,
-              scan_interval: school.scan_interval,
-            }
-          : emptyForm,
+      const base = school
+        ? {
+            name: school.name,
+            url: school.url,
+            scraper_strategy: school.scraper_strategy,
+            active: school.active,
+            scan_interval: school.scan_interval,
+          }
+        : emptyForm
+      setForm(base)
+      setCfg(
+        school?.config
+          ? { ...emptyConfig, ...school.config, selectors: { ...emptyConfig.selectors, ...((school.config as Record<string, unknown>).selectors as Record<string, string> || {}) } }
+          : emptyConfig,
       )
+      setConnError(null)
     }
   }, [open, school])
 
+  const updateCfg = (patch: Partial<ScraperConfig>) => {
+    const next = { ...cfg, ...patch }
+    setCfg(next)
+    setForm({ ...form, config: next as unknown as Record<string, unknown> })
+  }
+
+  const updateSelector = (key: string, val: string) => {
+    const next = { ...cfg, selectors: { ...cfg.selectors, [key]: val } }
+    setCfg(next)
+    setForm({ ...form, config: next as unknown as Record<string, unknown> })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setConnError(null)
     setSaving(true)
     try {
-      await onSave(form)
+      const payload: SchoolRegistryCreate = isGeneric
+        ? { ...form, config: cfg as unknown as Record<string, unknown> }
+        : { name: form.name, url: form.url, scraper_strategy: form.scraper_strategy ?? 'stub', active: form.active ?? true, scan_interval: form.scan_interval ?? 1440 }
+      const testResult = await schoolsApi.testConnection(payload.url)
+      if (!testResult.success) {
+        setConnError(testResult.error_msg || 'Connexion échouée.')
+        return
+      }
+      await onSave(payload)
       onOpenChange(false)
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Erreur inattendue'
+      setConnError(msg)
     } finally {
       setSaving(false)
     }
@@ -100,7 +162,7 @@ function SchoolFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{school ? 'Modifier l\'école' : 'Ajouter une école'}</DialogTitle>
           <DialogDescription>
@@ -139,6 +201,83 @@ function SchoolFormDialog({
               <Input id="school-interval" type="number" min={1} value={form.scan_interval} onChange={(e) => setForm({ ...form, scan_interval: Number(e.target.value) })} />
             </div>
           </div>
+
+          {isGeneric && (
+            <div className="space-y-4 rounded-lg border border-border/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Configuration scraper générique</p>
+
+              <div className="space-y-2">
+                <Label htmlFor="scraper-mode">Mode</Label>
+                <select
+                  id="scraper-mode"
+                  value={cfg.mode}
+                  onChange={(e) => updateCfg({ mode: e.target.value as 'sitemap' | 'list' })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="sitemap">Sitemap (auto-détection)</option>
+                  <option value="list">Page liste</option>
+                </select>
+              </div>
+
+              {cfg.mode === 'sitemap' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="sitemap-url">URL du sitemap</Label>
+                    <Input id="sitemap-url" value={cfg.sitemap_url} onChange={(e) => updateCfg({ sitemap_url: e.target.value })} placeholder="auto (détection automatique)" />
+                    <p className="text-xs text-muted-foreground">Laissez « auto » pour détecter automatiquement /sitemap.xml</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="url-pattern">Filtre URL</Label>
+                    <Input id="url-pattern" value={cfg.url_pattern} onChange={(e) => updateCfg({ url_pattern: e.target.value })} placeholder="/formation/" />
+                    <p className="text-xs text-muted-foreground">Ne garder que les URLs contenant ce pattern</p>
+                  </div>
+                </>
+              )}
+
+              {cfg.mode === 'list' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="list-url">URL de la page liste</Label>
+                    <Input id="list-url" value={cfg.list_url} onChange={(e) => updateCfg({ list_url: e.target.value })} placeholder="https://..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="link-selector">Sélecteur lien cours</Label>
+                    <Input id="link-selector" value={cfg.course_link_selector} onChange={(e) => updateCfg({ course_link_selector: e.target.value })} placeholder="a.card" />
+                    <p className="text-xs text-muted-foreground">Sélecteur CSS pour les liens vers chaque cours</p>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="use-jsonld"
+                  type="checkbox"
+                  checked={cfg.use_jsonld}
+                  onChange={(e) => updateCfg({ use_jsonld: e.target.checked })}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <Label htmlFor="use-jsonld">Extraire JSON-LD automatiquement</Label>
+              </div>
+
+              <div className="border-t border-border/50 pt-2">
+                <button type="button" onClick={() => setShowSelectors(!showSelectors)} className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+                  {showSelectors ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  Sélecteurs CSS (fallback si JSON-LD insuffisant)
+                </button>
+                {showSelectors && (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    {Object.keys(emptyConfig.selectors).map((key) => (
+                      <div key={key} className="space-y-1">
+                        <Label htmlFor={`sel-${key}`} className="text-xs capitalize">{key}</Label>
+                        <Input id={`sel-${key}`} value={cfg.selectors[key] || ''} onChange={(e) => updateSelector(key, e.target.value)} placeholder={`selecteur ${key}`} className="h-8 text-xs" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <input
               id="school-active"
@@ -149,6 +288,12 @@ function SchoolFormDialog({
             />
             <Label htmlFor="school-active">Active</Label>
           </div>
+          {connError && (
+            <div className="flex items-center gap-3 rounded-md border border-destructive/50 bg-destructive/5 p-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+              <p className="text-sm text-destructive">{connError}</p>
+            </div>
+          )}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">Annuler</Button>
@@ -283,6 +428,7 @@ export function SchoolsPage() {
   const [editingSchool, setEditingSchool] = useState<SchoolRegistry | null>(null)
   const [diffSchool, setDiffSchool] = useState<SchoolRegistry | null>(null)
   const [scanningIds, setScanningIds] = useState<Set<number>>(new Set())
+  const [scanMsg, setScanMsg] = useState<{ text: string; variant: 'success' | 'error' } | null>(null)
 
   const fetchSchools = async () => {
     setLoadState('loading')
@@ -347,11 +493,19 @@ export function SchoolsPage() {
   const handleScan = async (school: SchoolRegistry) => {
     setScanningIds((prev) => new Set(prev).add(school.id))
     try {
-      await schoolsApi.scan(school.id)
+      const result = await schoolsApi.scan(school.id)
+      if (result.status === 'error') {
+        setScanMsg({ text: result.error_msg || 'Échec du scan', variant: 'error' })
+      } else {
+        setScanMsg({ text: `Scan terminé : ${result.new} nouveau(x), ${result.modified} modifié(s)`, variant: 'success' })
+        setErrorMsg(null)
+      }
       await fetchSchools()
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Erreur inconnue'
       setErrorMsg(msg)
+      setScanMsg({ text: msg, variant: 'error' })
+      await fetchSchools()
     } finally {
       setScanningIds((prev) => { const next = new Set(prev); next.delete(school.id); return next })
     }
@@ -404,7 +558,23 @@ export function SchoolsPage() {
         )}
       </div>
 
-      {errorMsg && (
+      {scanMsg && (
+        <Card className={scanMsg.variant === 'error' ? 'border-destructive/50' : 'border-emerald-500/50'}>
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              {scanMsg.variant === 'error' ? (
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              )}
+              <p className={cn("text-sm", scanMsg.variant === 'error' ? "text-destructive" : "text-emerald-600")}>{scanMsg.text}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setScanMsg(null)}>Fermer</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {errorMsg && !scanMsg && (
         <Card className="border-destructive/50">
           <CardContent className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">

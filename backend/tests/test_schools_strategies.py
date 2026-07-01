@@ -49,19 +49,19 @@ async def test_strategies_returns_list_of_strings(client):
 
 
 @pytest.mark.asyncio
-async def test_strategies_contains_all_five_registered_scrapers(client):
-    """La liste contient les 5 scrapers enregistrés dans app/scrapers/."""
+async def test_strategies_contains_all_six_registered_scrapers(client):
+    """La liste contient les 6 scrapers enregistrés dans app/scrapers/."""
     await _register_and_login(client, "user2@test.com")
     resp = await client.get("/api/v1/schools/strategies")
     assert resp.status_code == 200
     names = resp.json()
 
-    expected = {"stub", "SCAP", "ORSYS", "Cegos", "Demos"}
+    expected = {"stub", "SCAP", "ORSYS", "Cegos", "Demos", "generic"}
     missing = expected - set(names)
     assert not missing, f"Scrapers manquants dans la réponse : {missing} (reçu : {names})"
 
-    # Et on a bien 5 entrées (pas plus, pas moins via l'API)
-    assert len(names) == 5, f"Attendu 5 scrapers, reçu {len(names)} : {names}"
+    # Et on a bien 6 entrées (pas plus, pas moins via l'API)
+    assert len(names) == 6, f"Attendu 6 scrapers, reçu {len(names)} : {names}"
 
 
 @pytest.mark.asyncio

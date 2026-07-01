@@ -33,6 +33,20 @@ cd frontend && npm install && npm run dev
 
 # tests
 cd backend && python -m pytest -v
+cd backend && python -m pytest tests/ -v -k "not integration"  # unit only
 cd backend && python -m alembic upgrade head   # migrations DB
 cd backend && python -m alembic current        # état migration
+
+# frontend
+cd frontend && cmd /c "npx vitest run"
+cd frontend && cmd /c "npm run typecheck"
 ```
+
+## Sessions
+### Session 1 (2026-07-01) — Scraper générique + test connexion config
+- `GenericScraperAdapter` : mode sitemap/list, JSON-LD + sélecteurs CSS fallback
+- Config scraper stockée dans `school_registries.config` (colonne JSON)
+- `POST /schools/test-connection` : teste l'URL avant sauvegarde (anti-SSRF)
+- Feedback visuel : scanMsg (succès/erreur) + connError dans dialog config
+- ICAN Design : config corrigée en mode sitemap
+- Tests : 307 backend, 71 frontend — tout vert

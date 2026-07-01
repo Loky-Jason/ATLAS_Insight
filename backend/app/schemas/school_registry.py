@@ -15,6 +15,7 @@ class SchoolRegistryCreate(BaseModel):
     scraper_strategy: str = Field(default="stub", max_length=50)
     active: bool = True
     scan_interval: int = Field(default=1440, ge=1)
+    config: dict | None = Field(default=None)
 
     @field_validator("url")
     @classmethod
@@ -28,6 +29,7 @@ class SchoolRegistryUpdate(BaseModel):
     scraper_strategy: str | None = Field(default=None, max_length=50)
     active: bool | None = None
     scan_interval: int | None = Field(default=None, ge=1)
+    config: dict | None = Field(default=None)
 
     @field_validator("url")
     @classmethod
@@ -45,6 +47,7 @@ class SchoolRegistryRead(BaseModel):
     active: bool
     scan_interval: int
     last_scanned_at: datetime | None
+    config: dict | None
     created_at: datetime
 
 
@@ -58,4 +61,14 @@ class SchoolRegistryList(BaseModel):
     active: bool
     scan_interval: int
     last_scanned_at: datetime | None
+    config: dict | None
     created_at: datetime
+
+
+class TestConnectionRequest(BaseModel):
+    url: str = Field(max_length=2048)
+
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, v: str) -> str:
+        return validate_external_url(v)
