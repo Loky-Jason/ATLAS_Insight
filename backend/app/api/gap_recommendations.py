@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -100,6 +101,25 @@ async def trigger_analysis(
     return summary
 
 
+@router.get("/{rec_id}", response_model=GapRecommendationRead)
+async def get_recommendation(
+    rec_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> GapRecommendation:
+    """Détail d'une recommandation."""
+    stmt = select(GapRecommendation).where(GapRecommendation.id == rec_id)
+    try:
+        result = await db.execute(stmt)
+        rec = result.scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        logger.error("Erreur DB get_recommendation %s : %s", rec_id, exc)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+    if not rec:
+        raise HTTPException(status_code=404, detail="Recommandation introuvable.")
+    return rec
+
+
 @router.post("/{rec_id}/approve")
 async def approve_recommendation(
     rec_id: int,
@@ -110,8 +130,29 @@ async def approve_recommendation(
     try:
         result = await gap_service.approve_recommendation(db, rec_id, current_user.id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        detail = str(exc)
+        status_code = 404 if "introuvable" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     except Exception as exc:
         logger.error("Erreur approve_recommendation %s : %s", rec_id, exc)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+    return result
+
+
+@router.post("/{rec_id}/reject")
+async def reject_recommendation(
+    rec_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Rejeter une recommandation (admin)."""
+    try:
+        result = await gap_service.reject_recommendation(db, rec_id, current_user.id)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "introuvable" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
+    except Exception as exc:
+        logger.error("Erreur reject_recommendation %s : %s", rec_id, exc)
         raise HTTPException(status_code=500, detail="Erreur serveur.")
     return result

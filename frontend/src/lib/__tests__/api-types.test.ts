@@ -13,6 +13,7 @@ import type {
   ScanDiff,
   DashboardCounts,
   GapRecommendationList,
+  GapRecommendationRead,
 } from '@/lib/api'
 import { dashboardApi, gapApi } from '@/lib/api'
 
@@ -339,5 +340,44 @@ describe('GapRecommendationList type (moved to Phase 1b section)', () => {
 
   it('gapApi.list references GapRecommendationList (compile-time check)', () => {
     expect(typeof gapApi.list).toBe('function')
+  })
+})
+
+describe('GapRecommendationRead type', () => {
+  it('accepts a full closure recommendation with all fields', () => {
+    const rec: GapRecommendationRead = {
+      id: 1, recommendation_type: 'closure', score: 85, status: 'draft',
+      rationale: 'Test', created_at: '2026-06-01T00:00:00Z',
+      scap_course_id: 42, market_course_id: null, creation_key: null,
+      score_breakdown: '{"schools_offering_count": 0.3}',
+      schools_offering: '["École A"]',
+      suggested_hours: null, certification_suggestions: null,
+      updated_at: null,
+    }
+    expect(rec.scap_course_id).toBe(42)
+  })
+
+  it('accepts a full creation recommendation', () => {
+    const rec: GapRecommendationRead = {
+      id: 2, recommendation_type: 'creation', score: 72, status: 'approved',
+      rationale: null, created_at: '2026-06-15T00:00:00Z',
+      scap_course_id: null, market_course_id: null, creation_key: 'ia-generative',
+      score_breakdown: null, schools_offering: null,
+      suggested_hours: 21, certification_suggestions: '["Certif A"]',
+      updated_at: '2026-06-16T00:00:00Z',
+    }
+    expect(rec.suggested_hours).toBe(21)
+  })
+
+  it('gapApi.listClosure returns GapRecommendationRead[]', async () => {
+    expect(typeof gapApi.listClosure).toBe('function')
+  })
+
+  it('gapApi.listCreation returns GapRecommendationRead[]', async () => {
+    expect(typeof gapApi.listCreation).toBe('function')
+  })
+
+  it('gapApi.reject returns record', async () => {
+    expect(typeof gapApi.reject).toBe('function')
   })
 })

@@ -8,9 +8,10 @@ Deux passes :
 
 from __future__ import annotations
 
-import difflib
+import asyncio
 import json
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -39,9 +40,38 @@ _SCORE_THRESHOLD = 40
 # Helpers
 # ---------------------------------------------------------------------------
 
+_WORD_RE = re.compile(r"\w+")
+
+
+def _token_set(text: str) -> set[str]:
+    """Mots normalisés (minuscules) d'une chaîne."""
+    return set(_WORD_RE.findall(text.lower()))
+
+
+def _token_similarity(tokens_a: set[str], tokens_b: set[str]) -> float:
+    """Similarité Dice entre deux ensembles de tokens."""
+    if not tokens_a and not tokens_b:
+        return 1.0
+    if not tokens_a or not tokens_b:
+        return 0.0
+    common = len(tokens_a & tokens_b)
+    return 2.0 * common / (len(tokens_a) + len(tokens_b))
+
+
 def _compute_similarity(a: str, b: str) -> float:
-    """Similarité [0,1] entre deux chaînes (insensible à la casse)."""
-    return difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    """Similarité [0,1] par recouvrement de tokens (rapport de Sørensen–Dice).
+
+    Plus rapide que SequenceMatcher sur des titres de cours tout en
+    conservant un seuil de 0.35 comparable.
+    """
+    tokens_a = _token_set(a)
+    tokens_b = _token_set(b)
+    if not tokens_a and not tokens_b:
+        return 1.0
+    if not tokens_a or not tokens_b:
+        return 0.0
+    common = len(tokens_a & tokens_b)
+    return 2.0 * common / (len(tokens_a) + len(tokens_b))
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
@@ -66,6 +96,11 @@ def _cluster_school_courses(
     Le représentant est le cours avec la meilleure similarité moyenne au cluster.
     """
     n = len(courses)
+    if n == 0:
+        return []
+
+    # Précalcule les tokens pour éviter de les recalculer à chaque comparaison
+    tokens = [_token_set(c.title) for c in courses]
     assigned = [False] * n
     clusters: list[list[int]] = []
 
@@ -79,7 +114,7 @@ def _cluster_school_courses(
                 continue
             # Vérifie la similarité avec n'importe quel membre déjà dans le cluster
             if any(
-                _compute_similarity(courses[k].title, courses[j].title) > _SIMILARITY_THRESHOLD
+                _token_similarity(tokens[k], tokens[j]) > _SIMILARITY_THRESHOLD
                 for k in cluster
             ):
                 cluster.append(j)
@@ -100,7 +135,7 @@ def _cluster_school_courses(
                 avg = 1.0
             else:
                 avg = sum(
-                    _compute_similarity(courses[idx].title, courses[o].title)
+                    _token_similarity(tokens[idx], tokens[o])
                     for o in others
                 ) / len(others)
             if avg > best_avg:
@@ -350,8 +385,9 @@ async def _pass2_creation(db: AsyncSession) -> list[dict[str, Any]]:
         logger.info("Tous les SchoolCourse ont un équivalent SCAP — creation analysis ignorée.")
         return []
 
-    # Clustering par similarité
-    clusters = _cluster_school_courses(unmatched)
+    # Clustering par similarité (CPU-bound : exécuté dans un thread worker
+    # pour ne pas bloquer la boucle événementielle du serveur).
+    clusters = await asyncio.to_thread(_cluster_school_courses, unmatched)
 
     created: list[dict[str, Any]] = []
     now = datetime.now(UTC)
@@ -511,6 +547,8 @@ async def approve_recommendation(
     rec = result.scalar_one_or_none()
     if not rec:
         raise ValueError(f"Recommandation #{rec_id} introuvable.")
+    if rec.status != "draft":
+        raise ValueError(f"Recommandation #{rec_id} n'est pas modifiable (statut: {rec.status}).")
 
     rec.status = "approved"
     db.add(rec)
@@ -540,22 +578,33 @@ async def approve_recommendation(
         action_taken = f"created_proposal_{proposal.id}"
 
     elif rec.recommendation_type == "closure":
-        if rec.scap_course_id:
-            course_result = await db.execute(
-                select(Course).where(Course.id == rec.scap_course_id)
+        if not rec.scap_course_id:
+            raise ValueError(
+                f"Recommandation closure #{rec_id} sans scap_course_id — impossible à approuver."
             )
-            course = course_result.scalar_one_or_none()
-            if course:
-                course.status = "archived"
-                db.add(course)
+        course_result = await db.execute(
+            select(Course).where(Course.id == rec.scap_course_id)
+        )
+        course = course_result.scalar_one_or_none()
+        if not course:
+            raise ValueError(
+                f"Cours SCAP #{rec.scap_course_id} lié à la recommandation #{rec_id} introuvable."
+            )
+        course.status = "archived"
+        db.add(course)
 
-                audit = AuditLog(
-                    user_id=user_id,
-                    action="archive_course",
-                    target=f"course:{course.id}:{course.title}",
-                )
-                db.add(audit)
-                action_taken = f"archived_course_{course.id}"
+        audit = AuditLog(
+            user_id=user_id,
+            action="archive_course",
+            target=f"course:{course.id}:{course.title}",
+        )
+        db.add(audit)
+        action_taken = f"archived_course_{course.id}"
+
+    else:
+        raise ValueError(
+            f"Type de recommandation '{rec.recommendation_type}' non supporté."
+        )
 
     db.add(
         AuditLog(
@@ -572,4 +621,35 @@ async def approve_recommendation(
         "type": rec.recommendation_type,
         "status": "approved",
         "action": action_taken,
+    }
+
+
+async def reject_recommendation(
+    db: AsyncSession, rec_id: int, user_id: int | None = None
+) -> dict[str, Any]:
+    """Rejette une recommandation (passe en rejected)."""
+    result = await db.execute(
+        select(GapRecommendation).where(GapRecommendation.id == rec_id)
+    )
+    rec = result.scalar_one_or_none()
+    if not rec:
+        raise ValueError(f"Recommandation #{rec_id} introuvable.")
+    if rec.status != "draft":
+        raise ValueError(f"Recommandation #{rec_id} n'est pas modifiable (statut: {rec.status}).")
+
+    rec.status = "rejected"
+    db.add(rec)
+    db.add(
+        AuditLog(
+            user_id=user_id,
+            action="reject_recommendation",
+            target=f"gap_recommendation:{rec.id}:{rec.recommendation_type}",
+        )
+    )
+    await db.flush()
+
+    return {
+        "id": rec.id,
+        "type": rec.recommendation_type,
+        "status": "rejected",
     }

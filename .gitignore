@@ -26,6 +26,8 @@ coverage/
 
 # Logs
 *.log
+*.err
+*.out
 .ruflo/logs/
 
 # OS / IDE

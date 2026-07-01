@@ -1,8 +1,8 @@
-"""initial_schema
+"""add_creation_key_if_missing
 
-Revision ID: f81738121747
-Revises:
-Create Date: 2026-06-28 01:56:36.831465
+Revision ID: 662f6fe18004
+Revises: f81738121747
+Create Date: 2026-07-01 12:00:00.000000
 
 """
 import logging
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError
 
 
-revision: str = 'f81738121747'
-down_revision: Union[str, Sequence[str], None] = None
+revision: str = '662f6fe18004'
+down_revision: Union[str, Sequence[str], None] = 'f81738121747'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -22,10 +22,10 @@ logger = logging.getLogger('alembic.migration')
 
 
 def upgrade() -> None:
-    """Ajoute creation_key de manière idempotente.
+    """Ajoute creation_key si la table existe et que la colonne manque.
 
-    Le modèle SQLAlchemy inclut cette colonne et `create_all()` la crée
-    déjà sur les bases fraîches ; on ignore donc l'erreur "duplicate column".
+    Le schéma est aussi créé par `Base.metadata.create_all()` au démarrage ;
+    cette migration reste donc idempotente pour les bases fraîches.
     """
     try:
         op.add_column(

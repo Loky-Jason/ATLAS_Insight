@@ -254,7 +254,10 @@ export const gapApi = {
     const query = qs.toString()
     return api.get<GapRecommendationList[]>(`/gap-recommendations${query ? `?${query}` : ''}`)
   },
+  listClosure: () => api.get<GapRecommendationRead[]>('/gap-recommendations/closure-candidates'),
+  listCreation: () => api.get<GapRecommendationRead[]>('/gap-recommendations/creation-suggestions'),
   approve: (id: number) => api.post<Record<string, unknown>>(`/gap-recommendations/${id}/approve`),
+  reject: (id: number) => api.post<Record<string, unknown>>(`/gap-recommendations/${id}/reject`),
 }
 
 // ── API helpers typés par domaine ─────────────────────────────────────────────
@@ -408,6 +411,17 @@ export interface GapRecommendationList {
   status: 'draft' | 'approved' | 'rejected' | 'implemented'
   rationale: string | null
   created_at: string
+}
+
+export interface GapRecommendationRead extends GapRecommendationList {
+  scap_course_id: number | null
+  market_course_id: number | null
+  creation_key: string | null
+  score_breakdown: string | null
+  schools_offering: string | null
+  suggested_hours: number | null
+  certification_suggestions: string | null
+  updated_at: string | null
 }
 
 export const schoolsApi = {

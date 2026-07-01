@@ -50,3 +50,15 @@ cd frontend && cmd /c "npm run typecheck"
 - Feedback visuel : scanMsg (succès/erreur) + connError dans dialog config
 - ICAN Design : config corrigée en mode sitemap
 - Tests : 307 backend, 71 frontend — tout vert
+
+### Session 2 (2026-07-01) — Pages recommandations (fermeture / création)
+- Composant partagé `GapRecommendationsList` (fermeture + création)
+- Backend : `GET /gap-recommendations/{id}`, `POST /{id}/approve`, `POST /{id}/reject`
+- Backend : `GET /gap-recommendations/closure-candidates` et `/creation-suggestions`
+- Fix DB : colonne `creation_key` manquante + migration idempotente `662f6fe18004`
+- Fix critique : rendu des certifications (`{label,type}` objets JSON)
+- Fix : `suggested_hours=0` n'était plus masqué, grammaire FR, mapping statut `implemented`
+- Guard : approve/reject refusés si statut ≠ `draft` (HTTP 409)
+- Perf analyse d'écart : similarité par tokens + thread worker (remplace `difflib` O(n²))
+- Graph connaissance mis à jour : 933 nœuds, 8103 arêtes, 122 fichiers
+- Tests : 325 backend, 88 frontend, TS clean — tout vert
