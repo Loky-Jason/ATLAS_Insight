@@ -1,5 +1,5 @@
 ﻿# Lessons — ATLAS_Insight
-**Updated:** 2026-06-27 — session 5
+**Updated:** 2026-07-01 — session 7
 
 ## 2026-06-27 — Scrapers multi-vendeurs : fragilité du filtre partagé
 ### Contexte
@@ -222,3 +222,15 @@ Props de présentation ajoutées sans test de sérialisation, et sans vérifier 
 2. 2 tests : `test_closure_candidates_serialize_course_title` (échoue si selectinload retiré) + `test_creation_has_no_redundant_description`.
 ### Règle
 Prop calculée qui lit une relation ⇒ TOUS les endpoints qui la sérialisent doivent `selectinload` la relation + 1 test qui casse si on l'enlève (lazy async ≠ lazy sync). Avant d'ajouter un champ d'affichage, vérifier que la vue ne le montre pas déjà ailleurs. Présentation (chaînes FR formatées) dans l'ORM = à éviter (core/ui), toléré ici tant que source unique.
+
+## 2026-07-01 — "Erreur serveur" veille = serveurs éteints, pas un bug
+### Contexte
+User : "Impossible de charger les écoles / Erreur serveur." sur la page Veille.
+### Problème
+Réflexe = chercher un bug backend. Endpoint `GET /schools` testé isolément (query, sérialisation Pydantic, ASGI+login) → 200, 6 écoles, aucun défaut.
+### Cause
+Rien n'écoutait sur `:8000`/`:5173` (`netstat`). Backend/frontend jamais relancés après fermeture session. Front mappe l'échec réseau (connection refused) sur le message générique "Erreur serveur.".
+### Solution
+Relancer les 2 serveurs. Aucun changement de code.
+### Règle
+Avant de débugger un "Erreur serveur" front : `netstat -ano | grep :8000` d'abord. Serveurs liés à la session Claude → morts à la fermeture. Un 500 générique côté front peut être un simple connection-refused, pas une exception backend.
