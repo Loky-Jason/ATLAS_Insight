@@ -1,5 +1,5 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-06-28 — Fix session : 6 issues review résolues, Alembic initialisé, CI verte. Prochaine : **Phase 2** (export PDF/Word, archives).
+**Last:** 2026-07-01 — Reprise handoff OpenCode : cartes reco affichent titre+description cours (props calculées `course_title`/`course_description` sur GapRecommendation, selectinload anti-N+1) ; + commits OpenCode intermédiaires (GenericScraperAdapter, test-connection avant save, cookie SameSite=lax, stratégies dynamiques, WAL SQLite). Poussé `d18108b`. **Backend 325 tests**, **front 89 vitest**, tsc clean. Prochaine : **Phase 2** (export PDF/Word, archives) ; dette Alembic demi-mesure à trancher (voir tasks/HANDOFF_OPENCODE.md §A) + perf gap_service O(n²).
 
 ## Durcissement revue Phase 1b/1c (2026-06-26)
 - **B1** `gap_service` : recommandations "creation" s'écrasaient toutes en 1 ligne (filtre upsert trop large) → colonne `creation_key` + insertion sans discriminant. Régression `tests/test_gap_service.py`.
