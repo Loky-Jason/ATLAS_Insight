@@ -208,3 +208,17 @@ Inutile sur les PC Mairie visés (bas de gamme) : `transition-all` force le navi
 Remplacé par `transition` (Tailwind default property set), `duration-[var(--duration-normal)]`, `ease-[var(--ease-out)]`. Progress bar → `transition-[width,background-color]` explicite car width n'est pas dans le default set.
 ### Règle
 Ne pas utiliser `transition-all` sur les composants d'UI fréquents. Préférer `transition` (set par défaut : color, bg, opacity, shadow, transform) ou un set explicite. Lier `duration-*` et `ease-*` aux tokens CSS quand ils existent (`--duration-normal`, `--ease-out`).
+
+## 2026-07-01 — Props calculées reco : lazy async + duplication UI
+### Contexte
+Feature OpenCode : cartes recommandations affichent `course_title`/`course_description` (props calculées sur le modèle `GapRecommendation`). Review 5 axes.
+### Problème
+1. `course_title` (closure) lit `self.scap_course`. En SQLAlchemy **async**, un lazy load implicite lève `MissingGreenlet` → crash. Sûr uniquement grâce au `selectinload`, mais **aucun test** ne le couvrait (retirer le selectinload = tests verts, runtime cassé).
+2. `course_description` (creation) construisait `"Proposé par X — Nh — certifs Z"` alors que la carte affiche DÉJÀ ces 3 infos (schools, badges heures/certifs) → triple redondance visuelle.
+### Cause
+Props de présentation ajoutées sans test de sérialisation, et sans vérifier ce que la carte rendait déjà.
+### Solution
+1. `course_description` retourne `None` pour creation (code mort retiré, commentaire `ponytail:` + chemin d'upgrade = stocker `rep.description` scrappée). Closure conservé (non redondant, `isClosure` masque les badges).
+2. 2 tests : `test_closure_candidates_serialize_course_title` (échoue si selectinload retiré) + `test_creation_has_no_redundant_description`.
+### Règle
+Prop calculée qui lit une relation ⇒ TOUS les endpoints qui la sérialisent doivent `selectinload` la relation + 1 test qui casse si on l'enlève (lazy async ≠ lazy sync). Avant d'ajouter un champ d'affichage, vérifier que la vue ne le montre pas déjà ailleurs. Présentation (chaînes FR formatées) dans l'ORM = à éviter (core/ui), toléré ici tant que source unique.

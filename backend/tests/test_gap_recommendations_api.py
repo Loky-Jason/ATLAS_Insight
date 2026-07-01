@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
+from app.models.course import Course
 from app.models.gap_recommendation import GapRecommendation
 
 
@@ -216,3 +217,54 @@ async def test_approve_recommendation_non_draft_returns_409(client, db_session):
     resp = await client.post(f"/api/v1/gap-recommendations/{rec.id}/approve")
     assert resp.status_code == 409
     assert "pas modifiable" in resp.json()["detail"]
+
+
+# ===================================================================
+# course_title / course_description (props calculées)
+# ===================================================================
+
+
+@pytest.mark.asyncio
+async def test_closure_candidates_serialize_course_title(client, db_session):
+    """/closure-candidates expose course_title/description sans crash lazy async.
+
+    Garde-fou : course_title lit rec.scap_course. En SQLAlchemy async, un lazy
+    load implicite lèverait MissingGreenlet — l'endpoint DOIT selectinload.
+    Ce test échoue si le selectinload est retiré.
+    """
+    await _register_and_login(client, "closure-title@test.com")
+
+    course = Course(title="Comptabilité publique", category="Finance", hours_estimated=40)
+    db_session.add(course)
+    await db_session.flush()
+
+    rec = GapRecommendation(
+        recommendation_type="closure",
+        scap_course_id=course.id,
+        score=90.0,
+        status="draft",
+    )
+    db_session.add(rec)
+    await db_session.flush()
+
+    resp = await client.get("/api/v1/gap-recommendations/closure-candidates")
+    assert resp.status_code == 200
+    item = next(r for r in resp.json() if r["id"] == rec.id)
+    assert item["course_title"] == "Comptabilité publique"
+    assert "Catégorie : Finance" in item["course_description"]
+
+
+@pytest.mark.asyncio
+async def test_creation_has_no_redundant_description(client, db_session):
+    """course_description = None pour creation (info déjà affichée par la carte)."""
+    rec = GapRecommendation(
+        recommendation_type="creation",
+        creation_key="charpente bois",
+        score=75.0,
+        status="draft",
+        score_breakdown='{"representative_title": "Charpente bois"}',
+        schools_offering='["ORSYS", "Cegos"]',
+        suggested_hours=35.0,
+    )
+    assert rec.course_title == "Charpente bois"
+    assert rec.course_description is None

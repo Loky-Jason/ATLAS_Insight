@@ -72,7 +72,13 @@ class GapRecommendation(Base):
 
     @property
     def course_description(self) -> str | None:
-        """Courte description de présentation du cours."""
+        """Courte description du cours. Closure uniquement.
+
+        ponytail: pas de description pour "creation" — la carte affiche déjà
+        écoles, heures et certifications en propre (schools_offering + badges).
+        La dupliquer ici = redondance. Rebrancher si un jour on stocke la vraie
+        description scrappée (rep.description dans score_breakdown).
+        """
         if self.recommendation_type == "closure" and self.scap_course:
             course = self.scap_course
             parts: list[str] = []
@@ -85,31 +91,6 @@ class GapRecommendation(Base):
             if course.notes:
                 parts.append(course.notes)
             return " — ".join(parts) if parts else None
-
-        if self.recommendation_type == "creation":
-            parts: list[str] = []
-            if self.schools_offering:
-                try:
-                    schools = json.loads(self.schools_offering)
-                    if isinstance(schools, list) and schools:
-                        parts.append(f"Proposé par {', '.join(str(s) for s in schools)}")
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            if self.suggested_hours:
-                parts.append(f"{self.suggested_hours:.0f}h estimées")
-            if self.certification_suggestions:
-                try:
-                    certs = json.loads(self.certification_suggestions)
-                    if isinstance(certs, list) and certs:
-                        labels = [
-                            c.get("label") or c.get("type")
-                            for c in certs
-                            if isinstance(c, dict)
-                        ]
-                        if labels:
-                            parts.append(f"certifications : {', '.join(str(lbl) for lbl in labels)}")
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            return " — ".join(parts) if parts else None
+        return None
 
         return None
