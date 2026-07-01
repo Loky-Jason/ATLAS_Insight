@@ -511,6 +511,7 @@ async def get_closure_candidates(db: AsyncSession) -> list[GapRecommendation]:
     """Top 50 recommandations de fermeture."""
     result = await db.execute(
         select(GapRecommendation)
+        .options(selectinload(GapRecommendation.scap_course))
         .where(GapRecommendation.recommendation_type == "closure")
         .order_by(GapRecommendation.score.desc())
         .limit(50)

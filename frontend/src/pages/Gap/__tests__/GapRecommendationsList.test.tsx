@@ -54,6 +54,8 @@ function makeRec(overrides: Partial<GapRecommendationRead> = {}) {
     scap_course_id: null,
     market_course_id: null,
     creation_key: null,
+    course_title: null,
+    course_description: null,
     created_at: '2026-07-01T00:00:00Z',
     updated_at: null,
     ...overrides,
@@ -112,6 +114,25 @@ describe('GapRecommendationsList', () => {
 
     // Schools (partial text match because it's inside the "Proposé par …" sentence)
     expect(screen.getByText(/Proposé par.*École A, École B/)).toBeInTheDocument()
+  })
+
+  // ── Card shows course title and description ──────────────────────────
+  it('displays course title and description when available', async () => {
+    mockListClosure.mockResolvedValue([
+      makeRec({
+        course_title: 'Cours Excel avancé',
+        course_description: 'Catégorie : Bureautique — 21h estimées — popularité 32/100',
+      }),
+    ])
+    render(<GapRecommendationsList variant="closure" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Cours Excel avancé')).toBeInTheDocument()
+    })
+
+    expect(
+      screen.getByText('Catégorie : Bureautique — 21h estimées — popularité 32/100')
+    ).toBeInTheDocument()
   })
 
   // ── Creation variant shows hours and certifications ───────────────────

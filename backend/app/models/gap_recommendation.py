@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -51,3 +52,64 @@ class GapRecommendation(Base):
 
     scap_course: Mapped[Course | None] = relationship(backref=backref("gap_recommendations", viewonly=True))
     market_course: Mapped[MarketCourse | None] = relationship(backref=backref("gap_recommendations", viewonly=True))
+
+    @property
+    def course_title(self) -> str | None:
+        """Titre du cours concerné (SCAP pour closure, titre représentatif pour creation)."""
+        if self.recommendation_type == "closure" and self.scap_course:
+            return self.scap_course.title
+        if self.recommendation_type == "creation":
+            if self.score_breakdown:
+                try:
+                    title = json.loads(self.score_breakdown).get("representative_title")
+                    if title:
+                        return title
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if self.creation_key:
+                return self.creation_key.strip().capitalize()
+        return None
+
+    @property
+    def course_description(self) -> str | None:
+        """Courte description de présentation du cours."""
+        if self.recommendation_type == "closure" and self.scap_course:
+            course = self.scap_course
+            parts: list[str] = []
+            if course.category:
+                parts.append(f"Catégorie : {course.category}")
+            if course.hours_estimated:
+                parts.append(f"{course.hours_estimated:.0f}h estimées")
+            if course.popularity_score is not None:
+                parts.append(f"popularité {course.popularity_score:.0f}/100")
+            if course.notes:
+                parts.append(course.notes)
+            return " — ".join(parts) if parts else None
+
+        if self.recommendation_type == "creation":
+            parts: list[str] = []
+            if self.schools_offering:
+                try:
+                    schools = json.loads(self.schools_offering)
+                    if isinstance(schools, list) and schools:
+                        parts.append(f"Proposé par {', '.join(str(s) for s in schools)}")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if self.suggested_hours:
+                parts.append(f"{self.suggested_hours:.0f}h estimées")
+            if self.certification_suggestions:
+                try:
+                    certs = json.loads(self.certification_suggestions)
+                    if isinstance(certs, list) and certs:
+                        labels = [
+                            c.get("label") or c.get("type")
+                            for c in certs
+                            if isinstance(c, dict)
+                        ]
+                        if labels:
+                            parts.append(f"certifications : {', '.join(str(lbl) for lbl in labels)}")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            return " — ".join(parts) if parts else None
+
+        return None

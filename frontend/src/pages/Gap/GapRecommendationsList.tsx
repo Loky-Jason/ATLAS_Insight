@@ -173,8 +173,18 @@ export function GapRecommendationsList({ variant }: { variant: Variant }) {
                   <div className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full', iconBg)}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">{rec.rationale ?? `Recommandation #${rec.id}`}</CardTitle>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">
+                      {rec.course_title ?? rec.rationale ?? `Recommandation #${rec.id}`}
+                    </CardTitle>
+                    {rec.course_description && (
+                      <p
+                        className="mt-1 line-clamp-2 text-sm text-muted-foreground"
+                        title={rec.course_description}
+                      >
+                        {rec.course_description}
+                      </p>
+                    )}
                     {schools.length > 0 && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         Proposé par {schools.join(', ')}

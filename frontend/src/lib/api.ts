@@ -422,6 +422,8 @@ export interface GapRecommendationRead extends GapRecommendationList {
   suggested_hours: number | null
   certification_suggestions: string | null
   updated_at: string | null
+  course_title: string | null
+  course_description: string | null
 }
 
 export const schoolsApi = {

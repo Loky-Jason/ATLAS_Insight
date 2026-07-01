@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.core.security import get_current_user, require_admin
@@ -108,7 +109,11 @@ async def get_recommendation(
     _: User = Depends(get_current_user),
 ) -> GapRecommendation:
     """Détail d'une recommandation."""
-    stmt = select(GapRecommendation).where(GapRecommendation.id == rec_id)
+    stmt = (
+        select(GapRecommendation)
+        .options(selectinload(GapRecommendation.scap_course))
+        .where(GapRecommendation.id == rec_id)
+    )
     try:
         result = await db.execute(stmt)
         rec = result.scalar_one_or_none()

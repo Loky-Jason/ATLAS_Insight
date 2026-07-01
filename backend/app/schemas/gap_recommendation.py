@@ -84,6 +84,8 @@ class GapRecommendationRead(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime | None
+    course_title: str | None = None
+    course_description: str | None = None
 
 
 class GapRecommendationList(BaseModel):

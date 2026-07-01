@@ -353,6 +353,8 @@ describe('GapRecommendationRead type', () => {
       schools_offering: '["École A"]',
       suggested_hours: null, certification_suggestions: null,
       updated_at: null,
+      course_title: 'Cours Excel avancé',
+      course_description: 'Catégorie : Bureautique',
     }
     expect(rec.scap_course_id).toBe(42)
   })
@@ -365,6 +367,8 @@ describe('GapRecommendationRead type', () => {
       score_breakdown: null, schools_offering: null,
       suggested_hours: 21, certification_suggestions: '["Certif A"]',
       updated_at: '2026-06-16T00:00:00Z',
+      course_title: 'IA générative',
+      course_description: '21h estimées — certifications : Certif A',
     }
     expect(rec.suggested_hours).toBe(21)
   })
