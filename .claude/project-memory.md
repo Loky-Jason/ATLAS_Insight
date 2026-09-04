@@ -1,5 +1,11 @@
 ﻿# Memory — ATLAS_Insight v2
-**Last:** 2026-07-01 — Reprise handoff OpenCode : cartes reco affichent titre+description cours (props calculées `course_title`/`course_description` sur GapRecommendation, selectinload anti-N+1) ; + commits OpenCode intermédiaires (GenericScraperAdapter, test-connection avant save, cookie SameSite=lax, stratégies dynamiques, WAL SQLite). Poussé `d18108b`. **Backend 325 tests**, **front 89 vitest**, tsc clean. Prochaine : **Phase 2** (export PDF/Word, archives) ; dette Alembic demi-mesure à trancher (voir tasks/HANDOFF_OPENCODE.md §A) + perf gap_service O(n²).
+**Last:** 2026-09-05 — **Dettes techniques soldées** (`e7480bf`, `9cc57f9`). Alembic reconstruit proprement (décision client : reconstruire, pas reverter comme le proposait HANDOFF §A) + SSRF par sitemap fermé + todo.md à jour + lint mécanique. **Backend 341 tests**, front 89 vitest, tsc clean. Prochaine : **Phase 2** (export PDF/Word, vue Archives).
+
+## Dettes soldées 2026-09-05
+- **Alembic** : les 3 migrations étaient inertes — `initial_schema` ne créait aucune table, et deux révisions partageaient le même ancêtre → `alembic upgrade head` échouait (2 heads), alors que la commande est documentée dans CLAUDE.md. Reconstruit : `8783a989e776` autogénérée avec les 10 tables ; `env.py` dérive l'URL de `settings` + `render_as_batch` ; **`init_db()` n'appelle plus `create_all`** — il route entre `upgrade head` et réparation + `stamp head --purge`. `_repair_legacy_schema()` ajoute tables/colonnes absentes et **lève** sur une NOT NULL sans défaut. Vérifié sur une copie de la vraie base (tamponnée `b6a77fe8f7bc`, révision supprimée → aurait empêché tout démarrage) : adoptée, `school_registry_id` ajoutée, 8 lignes intactes. 8 tests `tests/test_migrations.py`.
+- **SSRF sitemap** : les `<loc>` étaient suivis sans contrôle → GET possible vers `127.0.0.1`, `169.254.169.254` ou un hôte interne. Désormais `validate_external_url` + `is_same_site()` sur **chaque** URL moissonnée. `url_pattern` remplace le `/formation/` codé en dur (échec silencieux à 0 résultat). Override affaibli de `generic.py` supprimé. 7 tests.
+- **Reste ouvert** : 24 E501 (pur formatage, 12 fichiers non liés) ; provider veille réel toujours non branché (`scraper_strategy` défaut = `stub`).
+- Perf `gap_service` O(n²) : déjà résolue avant cette session (`_token_similarity` + `asyncio.to_thread`).
 
 ## Durcissement revue Phase 1b/1c (2026-06-26)
 - **B1** `gap_service` : recommandations "creation" s'écrasaient toutes en 1 ligne (filtre upsert trop large) → colonne `creation_key` + insertion sans discriminant. Régression `tests/test_gap_service.py`.
@@ -15,7 +21,7 @@
 - **Prochaine session : Phase 2** — export PDF (WeasyPrint) + Word (python-docx), vue Archives, archivage avancé. Avant : optimiser perf `gap_service` O(n²)+N+1 (chip `task_8aa9a344`, [[project-atlas-gap-perf]]).
 - Fragilité scraping (ponytail, non bloquant) : filtre sitemap `/formation/` hardcodé partagé (orsys+demos) + `<loc>` suivis sans allowlist → durcir au branchement scan réel.
 - Lancer en local : backend `cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` ; frontend `cd frontend && npm install && npm run dev` (port 5173). Admin : `admin@scap.paris` / `admin2026`.
-- Migrations DB : `cd backend && python -m alembic upgrade head` (Alembic initialisé le 28/06, première migration `initial_schema`).
+- Migrations DB : `cd backend && python -m alembic upgrade head` (fonctionne depuis le 05/09 ; l'historique du 28/06 était inerte et à deux têtes). Head courant : `8783a989e776`. Le démarrage de l'app applique déjà les migrations tout seul.
 - PowerShell note : si npm bloqué par execution policy, utiliser `cmd /c "cd frontend && npm run dev"`.
 - Règle process : après chaque sprint front+back, faire un **run d'intégration réel** (serveurs lancés + parcours navigateur) — les sous-agents valident build/pytest, pas le runtime câblé.
 
@@ -49,7 +55,7 @@
 ### Base — SQLite
 - Fichier : `data/atlas.db` (gitignored)
 - Chiffrement : BitLocker disque (pas SQLCipher)
-- Pas d'Alembic — création tables via `init_db()` au démarrage
+- **Alembic est la source de vérité du schéma** (depuis 2026-09-05). `init_db()` applique les migrations au démarrage ; il n'appelle plus `create_all` (seuls les tests le font, sur base en mémoire). Toute évolution de schéma = nouvelle migration, jamais un ALTER manuel.
 
 ## Key decisions
 | Décision | Date | Raison |
@@ -77,3 +83,6 @@
 | **datetime.now() sans timezone pour SQLite** | Phase 1c | SQLite stocke naive — `datetime.now(timezone.utc)` crashe les comparaisons temporelles en pass2 |
 | **transition-all → transition sur composants UI** | Review Phase 1c | Perf PC Mairie : set Tailwind default (color/bg/opacity/shadow/transform) suffit |
 | **Anim tokens CSS vars liés aux classes Tailwind** | Review Phase 1c | `duration-[var(--duration-normal)]`, `ease-[var(--ease-out)]` connectent tokens emil-design-eng |
+| **Alembic reconstruit plutôt que reverté** | 2026-09-05 | Décision client contre le défaut du HANDOFF §A : le bug « colonne manquante sur base existante » s'était produit 3 fois et exigeait un ALTER manuel. `create_all` n'ajoute jamais de colonne à une table existante |
+| **`init_db()` applique les migrations au démarrage** | 2026-09-05 | App locale mono-poste à la Mairie : personne ne lancera `alembic upgrade head` à la main. Adoption automatique d'une base pré-Alembic incluse |
+| **Allowlist d'hôte sur les URLs de sitemap** | 2026-09-05 | Les `<loc>` sont du contenu distant : sans contrôle, un sitemap fait émettre au serveur des requêtes arbitraires (SSRF). Anchor = l'hôte du sitemap, sous-domaines stricts uniquement |
