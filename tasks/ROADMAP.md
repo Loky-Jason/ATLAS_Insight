@@ -141,7 +141,23 @@ GapRecommendation (approved)
 
 ---
 
-## 📅 Phase 2 — Export, archivage, migration _(plus tard)_
+## ✅ Dettes techniques — _(soldées 2026-09-05)_
+
+> Commits `e7480bf` (Alembic) et `9cc57f9` (scrapers + docs + lint). Backend 341 tests.
+
+| Dette | Statut | Détail |
+|-------|--------|--------|
+| Alembic demi-mesure | ✅ | 3 migrations inertes (2 heads, `initial_schema` sans `CREATE TABLE`) → schéma réel autogénéré `8783a989e776` ; `init_db()` piloté par migrations + adoption d'une base pré-Alembic ou tamponnée sur révision inconnue |
+| SSRF par sitemap | ✅ | `<loc>` moissonnés validés (`validate_external_url` + `is_same_site`) ; override affaibli de `generic.py` supprimé |
+| Filtre `/formation/` figé | ✅ | Paramètre `url_pattern` (échouait en silence à 0 résultat sur un autre segment) |
+| `tasks/todo.md` périmé | ✅ | Remis à l'état réel |
+| Perf `gap_service` O(n²) | ✅ | Résolue avant cette session (`_token_similarity` + `asyncio.to_thread`) |
+| Lint E501 | 📅 | 24 lignes > 100 car. dans 12 fichiers non liés — passe de formatage dédiée |
+| Provider veille réel | 📅 | `scraper_strategy` défaut toujours `stub` |
+
+---
+
+## 📅 Phase 2 — Export, archivage, migration _(prochaine)_
 
 | Module | Priorité | Dépendances | Statut |
 |--------|----------|-------------|--------|
@@ -176,6 +192,7 @@ Semaine 4 : UX final (badges live, one-click actions, polish)
 | M1b — Phase 1b | ✅ 2026-06-27 | Multi-school scraper (5 adaptateurs), SchoolRegistry, SchoolCourse, scan/diff |
 | M1c — Phase 1c | ✅ 2026-06-27 | Gap Analysis, recommandations fermeture/création |
 | MUX — Refonte UX | ✅ 2026-06-27 | Navigation hiérarchique, dashboard hub, badges |
+| MD — Dettes techniques | ✅ 2026-09-05 | Alembic reconstruit, SSRF sitemap fermé, docs à jour |
 | M2 — Phase 2 | 🔜 prochaine | Export PDF/Word + archivage avancé |
 | M3 — Production | TBD | Migration M365/Entra ID |
 

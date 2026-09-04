@@ -200,7 +200,7 @@ async def test_busy_timeout_makes_second_writer_wait_instead_of_failing():
                             "La 2e écriture aurait dû BLOQUER (busy_timeout=30000) "
                             "mais a complété en <0.1s — le write lock n'est pas pris ?"
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Comportement attendu : conn2 attend, le timeout asyncio
                         # expire bien avant busy_timeout (30s).
                         pass
