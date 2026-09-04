@@ -234,3 +234,22 @@ Rien n'écoutait sur `:8000`/`:5173` (`netstat`). Backend/frontend jamais relanc
 Relancer les 2 serveurs. Aucun changement de code.
 ### Règle
 Avant de débugger un "Erreur serveur" front : `netstat -ano | grep :8000` d'abord. Serveurs liés à la session Claude → morts à la fermeture. Un 500 générique côté front peut être un simple connection-refused, pas une exception backend.
+
+## 2026-09-04 — Alembic demi-mesure : 2 heads, schéma initial vide, base réelle non démarrable
+### Contexte
+Dette « Alembic demi-mesure » (HANDOFF §A). Décision client : reconstruire proprement plutôt que reverter, parce que le bug « colonne manquante sur base existante » s'était déjà produit 3 fois (`school_registry_id`, `creation_key`, `config`) et exigeait un ALTER TABLE manuel à chaque fois.
+### Problème
+1. `alembic upgrade head` **échouait** : `662f6fe18004` et `b6a77fe8f7bc` avaient tous deux `down_revision = 'f81738121747'` → deux heads. Commande pourtant documentée dans CLAUDE.md.
+2. `f81738121747_initial_schema` ne créait **aucune table** — il ajoutait `creation_key`, exactement comme `662f6fe18004`. Impossible d'amorcer une base vierge.
+3. Après reconstruction, la vraie base de dev restait tamponnée `b6a77fe8f7bc` (révision supprimée) → `upgrade head` levait `Can't locate revision` : **l'app ne démarrait plus**.
+4. `stamp head` seul aurait déclaré « à jour » une base à qui il manquait réellement `market_courses.school_registry_id` — le bug survivait en silence.
+### Cause
+Alembic ajouté « pour cocher une case de review » sans jamais autogénérer le schéma, et sans supprimer `create_all`. Les deux mécanismes coexistaient, aucun n'était la source de vérité. Les migrations suivantes ont branché sur un ancêtre inerte.
+### Solution
+- 3 migrations supprimées, `alembic revision --autogenerate` sur base vierge → `8783a989e776` avec les **10 tables** réelles.
+- `alembic/env.py` dérive l'URL de `settings` (fin du drift avec `alembic.ini`) + `render_as_batch=True` (SQLite ne sait pas ALTER COLUMN).
+- `init_db()` ne fait plus `create_all` : il inspecte la base et route entre `upgrade head` (vierge / gérée) et réparation + `stamp head, purge=True` (pré-Alembic ou révision inconnue).
+- `_repair_legacy_schema()` : crée les tables absentes puis ajoute les colonnes absentes (nullable ou avec défaut), et **lève** sur une NOT NULL sans défaut plutôt que de corrompre.
+- 8 tests + preuve runtime sur une **copie de la vraie base** : adoptée, colonne ajoutée, 8 lignes intactes.
+### Règle
+Une migration nommée `initial_schema` doit créer le schéma — sinon ce n'est pas un initial. Vérifier `alembic heads` (un seul head) après toute migration ajoutée. Réécrire un historique de migrations casse toute base tamponnée sur une révision supprimée : prévoir le chemin d'adoption (`stamp --purge`) et vérifier le schéma réel avant de tamponner, jamais faire confiance au tampon seul. `create_all` n'ajoute **jamais** une colonne à une table existante : ne pas l'utiliser comme mécanisme d'évolution de schéma.
