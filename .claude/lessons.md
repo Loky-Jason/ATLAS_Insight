@@ -251,5 +251,24 @@ Alembic ajouté « pour cocher une case de review » sans jamais autogénérer l
 - `init_db()` ne fait plus `create_all` : il inspecte la base et route entre `upgrade head` (vierge / gérée) et réparation + `stamp head, purge=True` (pré-Alembic ou révision inconnue).
 - `_repair_legacy_schema()` : crée les tables absentes puis ajoute les colonnes absentes (nullable ou avec défaut), et **lève** sur une NOT NULL sans défaut plutôt que de corrompre.
 - 8 tests + preuve runtime sur une **copie de la vraie base** : adoptée, colonne ajoutée, 8 lignes intactes.
-### Règle
+### Règle (Alembic)
 Une migration nommée `initial_schema` doit créer le schéma — sinon ce n'est pas un initial. Vérifier `alembic heads` (un seul head) après toute migration ajoutée. Réécrire un historique de migrations casse toute base tamponnée sur une révision supprimée : prévoir le chemin d'adoption (`stamp --purge`) et vérifier le schéma réel avant de tamponner, jamais faire confiance au tampon seul. `create_all` n'ajoute **jamais** une colonne à une table existante : ne pas l'utiliser comme mécanisme d'évolution de schéma.
+
+## 2026-09-05 — SSRF par sitemap : les `<loc>` sont du contenu distant, pas une entrée de confiance
+### Contexte
+Dette « fragilité scraping » : segment `/formation/` figé dans `base.py` (partagé ORSYS/Demos) et `<loc>` suivis sans allowlist.
+### Problème
+1. Le filtre `/formation/` était codé en dur dans `_fetch_sitemap_urls` : une école dont le sitemap utilise `/cours/` renvoyait **zéro résultat en silence**, sans erreur.
+2. Plus grave : le scraper émettait un GET vers **n'importe quelle URL** trouvée dans le XML distant. Un sitemap compromis (ou une école hostile ajoutée au registre) pouvait viser `http://127.0.0.1:8000/...`, `http://169.254.169.254/...` ou un hôte interne — SSRF côté serveur. `validate_external_url` ne protégeait que l'URL **configurée** de l'école (niveau schéma Pydantic), jamais les URLs moissonnées.
+3. `generic.py` redéfinissait `_fetch_sitemap_urls` en version **plus faible** (aucun filtre), donc le durcissement de la base l'aurait contourné.
+4. Première version de l'allowlist trop permissive : `reference.endswith("." + host)` laissait passer `https://fr/...` pour un sitemap `www.orsys.fr` (« fr » est un hôte à label unique, qui résout souvent en interne sur un réseau d'entreprise).
+### Cause
+Confiance implicite dans un document servi par un tiers. La validation anti-SSRF existait mais était placée à la frontière de saisie utilisateur, pas à la frontière réseau où les URLs entrent réellement.
+### Solution
+- `url_pattern` paramétrable (`COURSE_URL_PATTERN` par défaut, `None` = pas de filtre).
+- `is_same_site()` dans `url_safety.py` : `www.` neutralisé des deux côtés, puis hôte identique ou sous-domaine **strict** du sitemap. Volontairement plus strict qu'une comparaison de domaine enregistrable — sans liste de suffixes publics, « deux labels communs » laisserait passer `evil.co.uk` pour `orsys.co.uk`.
+- Chaque `<loc>` passe `validate_external_url` **et** `is_same_site`, avec log du nombre d'URLs écartées.
+- Override affaibli de `generic.py` supprimé (réutilise la base) → un seul point de contrôle.
+- 7 tests, dont sitemaps hostiles (localhost, 169.254.169.254, `file://`, domaine tiers, suffixe `www.orsys.fr.evil.example.com`, hôte à label unique).
+### Règle
+Toute URL issue d'un document distant (sitemap, JSON-LD, `href` scrappé) est une entrée non fiable : la valider **au point de sortie réseau**, pas seulement à la saisie. Anchor de l'allowlist = l'hôte du document qui l'a fournie. Ne jamais redéfinir dans une sous-classe un helper porteur d'un contrôle de sécurité en version affaiblie — étendre le helper partagé. Un filtre codé en dur partagé par plusieurs adaptateurs échoue en silence (0 résultat) : le rendre paramétrable.

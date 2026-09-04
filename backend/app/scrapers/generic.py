@@ -38,12 +38,16 @@ from __future__ import annotations
 import json
 import logging
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
-import httpx
 from bs4 import BeautifulSoup
 
-from app.scrapers.base import BaseScraperAdapter, NormalisedCourse, register_scraper
+from app.scrapers.base import (
+    COURSE_URL_PATTERN,
+    BaseScraperAdapter,
+    NormalisedCourse,
+    register_scraper,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +73,6 @@ class GenericScraperAdapter(BaseScraperAdapter):
     # HTTP config
     # ------------------------------------------------------------------
 
-    def _fetch_sitemap_urls(self, sitemap_url: str, label: str) -> list[str]:
-        try:
-            resp = self._http.get(sitemap_url, timeout=30)
-            resp.raise_for_status()
-        except httpx.HTTPError as exc:
-            logger.error("%s — erreur sitemap : %s", label, exc)
-            raise RuntimeError(f"Échec récupération du sitemap {label}.") from exc
-        urls = re.findall(r"<loc>(.*?)</loc>", resp.text)
-        return [u.strip() for u in urls]
-
     def _configure_http(self, cfg: dict) -> None:
         self._max_courses = cfg.get("max_courses")
         for key, val in (cfg.get("headers") or {}).items():
@@ -90,13 +84,11 @@ class GenericScraperAdapter(BaseScraperAdapter):
 
     def _fetch_from_sitemap(self, cfg: dict) -> list[NormalisedCourse]:
         sitemap_url = self._resolve_sitemap_url(cfg)
-        url_pattern = cfg.get("url_pattern", "/formation/")
+        url_pattern = cfg.get("url_pattern", COURSE_URL_PATTERN)
         use_jsonld = cfg.get("use_jsonld", True)
 
         logger.info("Generic — sitemap: %s", sitemap_url)
-        urls = self._fetch_sitemap_urls(sitemap_url, "generic")
-        if url_pattern:
-            urls = [u for u in urls if url_pattern.lower() in u.lower()]
+        urls = self._fetch_sitemap_urls(sitemap_url, "generic", url_pattern)
         logger.info("Generic — %d URLs après filtre", len(urls))
 
         self._apply_max_courses(urls)
@@ -328,7 +320,7 @@ class GenericScraperAdapter(BaseScraperAdapter):
     def _normalize_duration(val: object) -> float | None:
         if val is None:
             return None
-        if isinstance(val, (int, float)):
+        if isinstance(val, int | float):
             return float(val)
         s = str(val).strip().lower()
         m = re.search(r"(\d+(?:\.\d+)?)\s*h", s)
@@ -346,7 +338,7 @@ class GenericScraperAdapter(BaseScraperAdapter):
     def _normalize_price(val: object) -> float | None:
         if val is None:
             return None
-        if isinstance(val, (int, float)):
+        if isinstance(val, int | float):
             return float(val)
         s = str(val).strip().replace("\xa0", "").replace(" ", "")
         m = re.search(r"(\d+(?:[.,]\d{1,2})?)", s)

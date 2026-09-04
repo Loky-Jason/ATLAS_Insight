@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 import httpx
@@ -74,6 +73,62 @@ SITEMAP_NO_FORMATION = """\
 SITEMAP_EMPTY = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</urlset>
+"""
+
+# Le sitemap Demos doit déclarer des URLs demos.fr : l'allowlist d'hôte
+# écarte désormais les URLs d'un autre domaine (cf. TestBaseFetchSitemapUrls).
+SITEMAP_DEMOS_TWO_FORMATIONS = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.demos.fr/formation/python-avance.html</loc></url>
+  <url><loc>https://www.demos.fr/formation/excel-debutant.html</loc></url>
+</urlset>
+"""
+
+SITEMAP_CUSTOM_PATTERN = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.orsys.fr/cours/python.html</loc></url>
+  <url><loc>https://www.orsys.fr/actualite.html</loc></url>
+</urlset>
+"""
+
+# Sitemap hostile : les `<loc>` sont du contenu distant, pas une entrée de confiance.
+SITEMAP_SSRF = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.orsys.fr/formation/legitime.html</loc></url>
+  <url><loc>http://127.0.0.1:8000/formation/admin</loc></url>
+  <url><loc>http://169.254.169.254/formation/latest/meta-data</loc></url>
+  <url><loc>http://localhost/formation/interne</loc></url>
+  <url><loc>file:///etc/formation/passwd</loc></url>
+</urlset>
+"""
+
+SITEMAP_OFFSITE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.orsys.fr/formation/legitime.html</loc></url>
+  <url><loc>https://evil.example.com/formation/piege.html</loc></url>
+  <url><loc>https://www.orsys.fr.evil.example.com/formation/suffixe.html</loc></url>
+</urlset>
+"""
+
+SITEMAP_SINGLE_LABEL = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.orsys.fr/formation/legitime.html</loc></url>
+  <url><loc>https://fr/formation/interne</loc></url>
+  <url><loc>https://intranet/formation/interne</loc></url>
+</urlset>
+"""
+
+SITEMAP_SUBDOMAIN = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://orsys.fr/formation/a.html</loc></url>
+  <url><loc>https://www.orsys.fr/formation/b.html</loc></url>
 </urlset>
 """
 
@@ -568,6 +623,62 @@ class TestBaseFetchSitemapUrls:
         with pytest.raises(RuntimeError, match="Échec récupération du sitemap"):
             adapter._fetch_sitemap_urls("https://www.orsys.fr/sitemap.xml", "test")
 
+    def test_custom_url_pattern_is_honoured(self):
+        """Le segment d'URL n'est plus figé sur `/formation/`."""
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_CUSTOM_PATTERN)
+        urls = adapter._fetch_sitemap_urls(
+            "https://www.orsys.fr/sitemap.xml", "test", url_pattern="/cours/"
+        )
+        assert urls == ["https://www.orsys.fr/cours/python.html"]
+
+    def test_none_url_pattern_disables_filter(self):
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_CUSTOM_PATTERN)
+        urls = adapter._fetch_sitemap_urls(
+            "https://www.orsys.fr/sitemap.xml", "test", url_pattern=None
+        )
+        assert len(urls) == 2
+
+    def test_internal_urls_in_sitemap_are_rejected(self):
+        """SSRF : un sitemap ne doit pas pouvoir viser localhost ou le réseau interne."""
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_SSRF)
+        urls = adapter._fetch_sitemap_urls(
+            "https://www.orsys.fr/sitemap.xml", "test"
+        )
+        assert urls == ["https://www.orsys.fr/formation/legitime.html"]
+
+    def test_offsite_urls_in_sitemap_are_rejected(self):
+        """Un sitemap ne doit pas faire scraper un autre domaine."""
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_OFFSITE)
+        urls = adapter._fetch_sitemap_urls(
+            "https://www.orsys.fr/sitemap.xml", "test"
+        )
+        assert urls == ["https://www.orsys.fr/formation/legitime.html"]
+
+    def test_subdomain_of_sitemap_host_is_allowed(self):
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_SUBDOMAIN)
+        urls = adapter._fetch_sitemap_urls(
+            "https://orsys.fr/sitemap.xml", "test"
+        )
+        assert len(urls) == 2
+
+    def test_single_label_host_is_rejected(self):
+        """`www.orsys.fr` ne doit pas « appartenir » au site `fr`.
+
+        Un hôte à label unique résout souvent vers une machine interne sur un
+        réseau d'entreprise : c'est un vecteur SSRF, pas un domaine légitime.
+        """
+        adapter = _make_adapter(ORSYSScraperAdapter)
+        adapter._http.get.return_value = _mock_response(SITEMAP_SINGLE_LABEL)
+        urls = adapter._fetch_sitemap_urls(
+            "https://www.orsys.fr/sitemap.xml", "test"
+        )
+        assert urls == ["https://www.orsys.fr/formation/legitime.html"]
+
 
 # ====================================================================
 # ORSYS
@@ -966,7 +1077,7 @@ class TestDemosFetchAllCourses:
 
     def test_happy_path(self):
         adapter = _make_adapter(DemosScraperAdapter)
-        sitemap_resp = _mock_response(SITEMAP_TWO_FORMATIONS)
+        sitemap_resp = _mock_response(SITEMAP_DEMOS_TWO_FORMATIONS)
         course_resp = _mock_response(DEMOS_HTML_FULL)
 
         def side_effect(url, **kw):
@@ -994,7 +1105,7 @@ class TestDemosFetchAllCourses:
 
     def test_partial_course_failures_skipped(self):
         adapter = _make_adapter(DemosScraperAdapter)
-        sitemap_resp = _mock_response(SITEMAP_TWO_FORMATIONS)
+        sitemap_resp = _mock_response(SITEMAP_DEMOS_TWO_FORMATIONS)
         ok_resp = _mock_response(DEMOS_HTML_FULL)
         err_resp = _mock_response(status_code=500)
 
