@@ -22,7 +22,10 @@
 - [ ] **2.1** Export PDF (WeasyPrint) — endpoint + bouton front (une feature backend
       non atteignable depuis l'UI n'est pas livrée)
 - [ ] **2.2** Export Word (python-docx) — réutiliser la couche de récupération de 2.1
-- [ ] **2.3** Vue Archives front — vérifier d'abord si un endpoint existant suffit
+- [x] **2.3** Vue Archives front — **aucun endpoint nouveau** (`GET /courses?status=archived`,
+      `POST /{id}/restore` et les helpers client existaient déjà). Cours archivés +
+      recherche + restauration admin, et recommandations validées. 14 tests.
+      Reste à faire : **le parcours navigateur réel** (login requis)
 - [ ] **2.4** Archivage avancé (batch, filtres) — après stabilisation de 2.1–2.3
 - [ ] **2.5** Migration M365 / Entra ID — reporté
 
