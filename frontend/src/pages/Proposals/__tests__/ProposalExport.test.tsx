@@ -9,13 +9,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 const mockGet = vi.hoisted(() => vi.fn())
 const mockProposalPdf = vi.hoisted(() => vi.fn())
+const mockProposalDocx = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
   return {
     ...actual,
     api: { ...actual.api, get: mockGet },
-    exportApi: { proposalPdf: mockProposalPdf },
+    exportApi: { proposalPdf: mockProposalPdf, proposalDocx: mockProposalDocx },
   }
 })
 
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockGet.mockResolvedValue([PROPOSAL])
   mockProposalPdf.mockResolvedValue(undefined)
+  mockProposalDocx.mockResolvedValue(undefined)
 })
 
 describe('Page Propositions — bouton export', () => {
@@ -49,13 +51,33 @@ describe('Page Propositions — bouton export', () => {
     ).toBeInTheDocument()
   })
 
-  it('déclenche l’export de la bonne proposition', async () => {
+  it('expose aussi un bouton d’export Word (G6)', async () => {
     render(<ProposalsPage />)
     await waitFor(() => expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: /Exporter/ }))
+    expect(
+      screen.getByRole('button', { name: 'Exporter « Excel perfectionnement » en Word' }),
+    ).toBeInTheDocument()
+  })
+
+  it('déclenche l’export PDF de la bonne proposition', async () => {
+    render(<ProposalsPage />)
+    await waitFor(() => expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /en PDF/ }))
 
     await waitFor(() => expect(mockProposalPdf).toHaveBeenCalledWith(4))
+    expect(mockProposalDocx).not.toHaveBeenCalled()
+  })
+
+  it('déclenche l’export Word sans déclencher le PDF', async () => {
+    render(<ProposalsPage />)
+    await waitFor(() => expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /en Word/ }))
+
+    await waitFor(() => expect(mockProposalDocx).toHaveBeenCalledWith(4))
+    expect(mockProposalPdf).not.toHaveBeenCalled()
   })
 
   it('affiche l’échec sans casser la page', async () => {
@@ -63,7 +85,7 @@ describe('Page Propositions — bouton export', () => {
     render(<ProposalsPage />)
     await waitFor(() => expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: /Exporter/ }))
+    fireEvent.click(screen.getByRole('button', { name: /en PDF/ }))
 
     await waitFor(() =>
       expect(
@@ -71,6 +93,22 @@ describe('Page Propositions — bouton export', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument()
+  })
+
+  it('signale l’échec d’un export Word avec son propre message', async () => {
+    mockProposalDocx.mockRejectedValue(
+      new ApiError(500, 'Échec de la génération du document Word.'),
+    )
+    render(<ProposalsPage />)
+    await waitFor(() => expect(screen.getByText('Excel perfectionnement')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /en Word/ }))
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Export impossible : Échec de la génération du document Word.'),
+      ).toBeInTheDocument(),
+    )
   })
 })
 

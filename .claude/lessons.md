@@ -312,6 +312,25 @@ Assainissement écrit « à l'instinct » sans vérifier ce que chaque passe fil
 ### Règle
 Un filtre de caractères se vérifie en l'exécutant sur les cas limites, pas en le relisant : écrire la sonde (`_to_latin1("A\x00B")`) avant de croire le code. « Encodable en latin-1 » ≠ « imprimable » — les caractères de contrôle passent. Et ne jamais révoquer une object URL dans le même tick que le clic qui la consomme.
 
+## 2026-09-05 — Export Word : un contenu, deux rendus
+### Contexte
+Phase 2.2, export `.docx` (python-docx). Le HANDOFF imposait de réutiliser la couche de récupération de 2.1 sans la dupliquer.
+### Problème
+1. Le rendu PDF mélangeait **quoi afficher** et **comment l'afficher** : statut, date, heures et sections étaient calculés au milieu des appels `multi_cell`. Copier ça pour le Word aurait créé deux sources de vérité — un champ ajouté un jour dans un seul format.
+2. `_to_latin1` aurait été appliqué au Word par simple copier-coller. C'est une contrainte des **polices de base de fpdf2**, pas du contenu : `.docx` est de l'UTF-8. Le japonais et les emoji doivent survivre au Word alors qu'ils sont retirés du PDF.
+3. Revue : `subtitle.runs[0].italic` lève `IndexError` sur un paragraphe vide — `add_paragraph("")` ne crée aucun run. Inatteignable aujourd'hui (le sous-titre est toujours rempli), mine pour plus tard.
+4. Revue : `export_proposal` (PDF) vs `export_proposal_docx` — nommage asymétrique, les deux formats n'étaient pas distinguables proprement en analyse de journal.
+### Cause
+Le premier format écrit sert de moule au second. Sans extraction préalable, la duplication est le chemin de moindre effort.
+### Solution
+- `build_proposal_content()` renvoie un `ProposalContent` (titre, sous-titre, sections) : **source unique**. `render_proposal_pdf` et `render_proposal_docx` ne sont que deux rendus. Un test vérifie que tout le contenu de la structure se retrouve dans le `.docx`.
+- `_to_latin1` reste appliqué au seul PDF, avec le pourquoi en docstring. Test dédié : le `.docx` conserve « 日本語 » et « 🎓 ».
+- Garde `if subtitle.runs:`.
+- `export_proposal_pdf` / `export_proposal_docx`, plus un test qui vérifie que les deux actions nomment leur format.
+- Endpoint : `_load_proposal`, `_trace_export` et `_attachment` extraits, les deux routes ne dupliquent plus la récupération ni l'en-tête.
+### Règle
+Avant d'ajouter un second format d'export, extraire d'abord *ce qui est affiché* de *comment c'est affiché* — sinon les deux divergent au premier champ ajouté. Et ne pas transporter dans le nouveau format les contraintes techniques de l'ancien : vérifier lesquelles viennent de la bibliothèque, pas du contenu. Deux actions jumelles dans un journal doivent nommer ce qui les distingue.
+
 ### Piège worktree (2026-09-05)
 Le premier lancement des serveurs se faisait sur `backend/data/atlas.db` **du worktree** : 0 utilisateur, 0 cours. Aucune connexion n'était possible, quels que soient les identifiants — et rien dans l'UI ne le disait (juste un échec de login). La base réelle est celle du repo principal ; en worktree, passer `DATABASE_URL` explicitement.
 Corollaire : avant de conclure « les identifiants sont faux », vérifier que la table `users` n'est pas simplement vide.

@@ -23,7 +23,10 @@
       `GET /export/proposals/{id}.pdf` + bouton par ligne dans Propositions. 20 tests back,
       7 front. GET sûr : n'écrit pas le statut `exported`, mais trace un AuditLog.
       Reste à faire : **le clic réel** (téléchargement navigateur, non testable en jsdom)
-- [ ] **2.2** Export Word (python-docx) — réutiliser la couche de récupération de 2.1
+- [x] **2.2** Export Word (python-docx) — `GET /export/proposals/{id}.docx` + second bouton.
+      Contenu défini une seule fois (`build_proposal_content`), PDF et Word ne sont que
+      deux rendus. Pas d'assainissement latin-1 côté Word : l'UTF-8 y est natif.
+      Reste à faire : **ouvrir le .docx dans Word** pour valider la mise en page
 - [x] **2.3** Vue Archives front — **aucun endpoint nouveau** (`GET /courses?status=archived`,
       `POST /{id}/restore` et les helpers client existaient déjà). Cours archivés +
       recherche + restauration admin, et recommandations validées. 14 tests.
@@ -34,7 +37,7 @@
 ## Spécifications à rédiger avant implémentation
 
 - [x] `specs/export-pdf.md` (2.1)
-- [ ] `specs/export-word.md` (2.2)
+- [x] `specs/export-word.md` (2.2)
 - [ ] `specs/archives-view.md` (2.3)
 
 ## Qualité (rappel continu)

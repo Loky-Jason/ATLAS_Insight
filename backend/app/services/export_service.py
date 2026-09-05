@@ -1,8 +1,11 @@
-"""Génération des exports de propositions de cours (PDF).
+"""Génération des exports de propositions de cours (PDF et Word).
 
 fpdf2 plutôt que WeasyPrint (écart assumé à `docs/SPEC.md`, cf.
 `specs/export-pdf.md`) : WeasyPrint dépend de GTK/Pango en librairies système,
 à installer sur chaque poste Windows ; fpdf2 est pur Python.
+
+Le contenu affiché est décrit une seule fois (`build_proposal_content`) ; PDF et
+Word ne sont que deux rendus de cette description. Cf. `specs/export-word.md`.
 """
 
 from __future__ import annotations
@@ -11,7 +14,10 @@ import json
 import logging
 import re
 import unicodedata
+from dataclasses import dataclass
+from io import BytesIO
 
+from docx import Document
 from fpdf import FPDF
 
 from app.models.course_proposal import CourseProposal
@@ -124,9 +130,55 @@ def _slugify(value: str) -> str:
     return slug[:60] or "proposition"
 
 
-def build_proposal_filename(proposal: CourseProposal) -> str:
-    """Nom du fichier téléchargé, stable et lisible."""
-    return f"proposition-{proposal.id}-{_slugify(proposal.title)}.pdf"
+def build_proposal_filename(proposal: CourseProposal, extension: str) -> str:
+    """Nom du fichier téléchargé, stable et lisible.
+
+    Le slug ne contient que `[a-z0-9-]` : rien ne peut s'échapper de l'en-tête
+    `Content-Disposition`.
+    """
+    return f"proposition-{proposal.id}-{_slugify(proposal.title)}.{extension}"
+
+
+@dataclass(frozen=True)
+class ProposalContent:
+    """Ce qu'un export affiche, indépendamment du format.
+
+    Source unique du contenu : PDF et Word rendent cette structure. Un champ
+    ajouté ici apparaît dans les deux formats sans double saisie.
+    """
+
+    title: str
+    subtitle: str
+    sections: tuple[tuple[str, str], ...]
+
+
+def build_proposal_content(proposal: CourseProposal) -> ProposalContent:
+    """Décrit le document à produire pour une proposition.
+
+    Toutes les valeurs absentes deviennent « — » : un export ne doit jamais
+    afficher « None » à une hiérarchie.
+    """
+    status_label = STATUS_LABELS.get(proposal.status, proposal.status)
+    created = proposal.created_at.strftime("%d/%m/%Y") if proposal.created_at else "—"
+    hours = (
+        f"{proposal.hours_estimated:g} h"
+        if proposal.hours_estimated is not None
+        else "—"
+    )
+
+    return ProposalContent(
+        title=proposal.title,
+        subtitle=f"Statut : {status_label}   |   Créé le {created}",
+        sections=(
+            ("Heures estimées", hours),
+            ("Description", (proposal.description or "").strip() or "—"),
+            (
+                "Pistes de certification",
+                _format_json_field(proposal.certification_suggestions),
+            ),
+            ("Éléments d'origine", _format_json_field(proposal.based_on)),
+        ),
+    )
 
 
 class _ProposalPdf(FPDF):
@@ -153,9 +205,10 @@ def _section(pdf: FPDF, title: str, body: str) -> None:
 def render_proposal_pdf(proposal: CourseProposal) -> bytes:
     """Construit le PDF d'une proposition de cours.
 
-    Toutes les valeurs absentes sont rendues « — » : un export ne doit jamais
-    afficher « None » à une hiérarchie.
+    Le texte passe par `_to_latin1` : contrainte des polices de base de fpdf2,
+    pas du contenu — l'export Word n'en a pas besoin.
     """
+    content = build_proposal_content(proposal)
     try:
         pdf = _ProposalPdf(format="A4")
         pdf.set_auto_page_break(auto=True, margin=20)
@@ -163,39 +216,47 @@ def render_proposal_pdf(proposal: CourseProposal) -> bytes:
         pdf.add_page()
 
         pdf.set_font("Helvetica", "B", 16)
-        pdf.multi_cell(_CONTENT_WIDTH_MM, 8, _to_latin1(proposal.title))
+        pdf.multi_cell(_CONTENT_WIDTH_MM, 8, _to_latin1(content.title))
         pdf.ln(2)
-
-        status_label = STATUS_LABELS.get(proposal.status, proposal.status)
-        created = (
-            proposal.created_at.strftime("%d/%m/%Y") if proposal.created_at else "—"
-        )
-        hours = (
-            f"{proposal.hours_estimated:g} h"
-            if proposal.hours_estimated is not None
-            else "—"
-        )
 
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(110)
-        pdf.multi_cell(
-            _CONTENT_WIDTH_MM,
-            5,
-            _to_latin1(f"Statut : {status_label}   |   Créé le {created}"),
-        )
+        pdf.multi_cell(_CONTENT_WIDTH_MM, 5, _to_latin1(content.subtitle))
         pdf.set_text_color(0)
         pdf.ln(4)
 
-        _section(pdf, "Heures estimées", hours)
-        _section(pdf, "Description", (proposal.description or "").strip() or "—")
-        _section(
-            pdf,
-            "Pistes de certification",
-            _format_json_field(proposal.certification_suggestions),
-        )
-        _section(pdf, "Éléments d'origine", _format_json_field(proposal.based_on))
+        for heading, body in content.sections:
+            _section(pdf, heading, body)
 
         return bytes(pdf.output())
     except Exception as exc:
         logger.error("Erreur génération PDF proposition %s : %s", proposal.id, exc)
         raise RuntimeError("Échec de la génération du PDF.") from exc
+
+
+def render_proposal_docx(proposal: CourseProposal) -> bytes:
+    """Construit le `.docx` éditable d'une proposition de cours.
+
+    Aucun assainissement de caractères : `.docx` est de l'UTF-8, contrairement
+    aux polices de base du PDF. Le japonais et les emoji survivent ici.
+    """
+    content = build_proposal_content(proposal)
+    try:
+        document = Document()
+        document.add_heading(content.title, level=1)
+
+        subtitle = document.add_paragraph(content.subtitle)
+        # Un paragraphe vide n'a aucun run : ne pas indexer à l'aveugle.
+        if subtitle.runs:
+            subtitle.runs[0].italic = True
+
+        for heading, body in content.sections:
+            document.add_heading(heading, level=2)
+            document.add_paragraph(body)
+
+        buffer = BytesIO()
+        document.save(buffer)
+        return buffer.getvalue()
+    except Exception as exc:
+        logger.error("Erreur génération DOCX proposition %s : %s", proposal.id, exc)
+        raise RuntimeError("Échec de la génération du document Word.") from exc
