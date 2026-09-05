@@ -26,7 +26,7 @@ Coordinateur pédagogique (20 ans d'expérience). Veut un outil qui :
 | Import données | Excel/CSV via pandas + openpyxl |
 | Veille | Scrapping multi-écoles via adapters dédiés (registre d'écoles, 1 classe par école) |
 | Gap Analysis | Moteur automatique croisant cours SCAP × marché, avec scores pondérés |
-| Export | **PDF** (WeasyPrint) + **Word** (.docx, python-docx) |
+| Export | **PDF** (fpdf2) + **Word** (.docx, python-docx). fpdf2 remplace WeasyPrint depuis le 2026-09-05 : WeasyPrint exige GTK/Pango en librairies système sur chaque poste Windows, fpdf2 est pur Python. Cf. `specs/export-pdf.md` |
 | Estimation heures/certif | Module auto par comparaison (pas de référentiel fourni) |
 | Langue | UI **français**, code **anglais** |
 | Contrainte | Léger, PC peu performants → pas d'Electron, bundle minimal |

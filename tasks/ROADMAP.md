@@ -161,7 +161,7 @@ GapRecommendation (approved)
 
 | Module | Priorité | Dépendances | Statut |
 |--------|----------|-------------|--------|
-| **2.1** Export PDF (WeasyPrint) | P0 | Phase 1 complète | 📅 |
+| **2.1** Export PDF (**fpdf2**) | P0 | Phase 1 complète | ✅ 2026-09-05 — `GET /export/proposals/{id}.pdf` + bouton Propositions |
 | **2.2** Export Word (python-docx) | P0 | Phase 1 complète | 📅 |
 | **2.3** Archives view frontend | P1 | Phase 1 | ✅ 2026-09-05 — frontend seul, aucun endpoint nouveau |
 | **2.4** Archivage avancé (batch, filtre) | P1 | Phase 1 | 📅 |

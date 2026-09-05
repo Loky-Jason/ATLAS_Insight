@@ -29,7 +29,12 @@ export function setOnUnauthorized(callback: () => void): void {
   onUnauthorized = callback
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * Exécute la requête et applique la gestion d'erreur commune (réseau, 401,
+ * `detail` du backend). Partagé par les réponses JSON et les téléchargements :
+ * une session expirée doit déclencher le même comportement dans les deux cas.
+ */
+async function performRequest(path: string, init: RequestInit = {}): Promise<Response> {
   const url = `${BASE_URL}${path}`
 
   let response: Response
@@ -62,10 +67,45 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(response.status, message)
   }
 
+  return response
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await performRequest(path, init)
+
   // 204 No Content
   if (response.status === 204) return undefined as unknown as T
 
   return response.json() as Promise<T>
+}
+
+/** Nom de fichier proposé par le serveur, sinon repli fourni par l'appelant. */
+function filenameFromResponse(response: Response, fallback: string): string {
+  const disposition = response.headers.get('content-disposition') ?? ''
+  const match = /filename="([^"]+)"/.exec(disposition)
+  return match?.[1] ?? fallback
+}
+
+/**
+ * Récupère un fichier binaire et déclenche son enregistrement par le navigateur.
+ * L'URL objet est révoquée pour ne pas retenir le blob en mémoire.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const response = await performRequest(path, { method: 'GET' })
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  try {
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filenameFromResponse(response, fallbackName)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  } finally {
+    // Révocation différée : révoquer dans le même tick que le clic annule le
+    // téléchargement sur certains navigateurs, qui n'ont pas encore lu le blob.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+  }
 }
 
 // ── Méthodes HTTP publiques ───────────────────────────────────────────────────
@@ -261,6 +301,11 @@ export const gapApi = {
 }
 
 // ── API helpers typés par domaine ─────────────────────────────────────────────
+
+export const exportApi = {
+  proposalPdf: (id: number) =>
+    downloadFile(`/export/proposals/${id}.pdf`, `proposition-${id}.pdf`),
+}
 
 export const coursesApi = {
   list: (params?: { status?: string; category?: string; search?: string; year?: number }) => {

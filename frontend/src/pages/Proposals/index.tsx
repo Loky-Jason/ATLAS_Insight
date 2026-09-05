@@ -3,10 +3,11 @@ import {
   Search,
   Plus,
   Pencil,
+  FileDown,
   AlertTriangle,
   Lightbulb,
 } from 'lucide-react'
-import { api, ApiError, type CourseProposal } from '@/lib/api'
+import { api, ApiError, exportApi, type CourseProposal } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -225,6 +226,24 @@ export function ProposalsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProposal, setEditingProposal] = useState<CourseProposal | null>(null)
+  const [exportingId, setExportingId] = useState<number | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const handleExport = async (proposal: CourseProposal) => {
+    setExportError(null)
+    setExportingId(proposal.id)
+    try {
+      await exportApi.proposalPdf(proposal.id)
+    } catch (err) {
+      setExportError(
+        err instanceof ApiError
+          ? `Export impossible : ${err.message}`
+          : 'Export impossible : erreur inconnue.',
+      )
+    } finally {
+      setExportingId(null)
+    }
+  }
 
   const fetchProposals = async () => {
     setLoadState('loading')
@@ -353,6 +372,20 @@ export function ProposalsPage() {
         </CardContent>
       </Card>
 
+      {exportError && (
+        <Card className="border-destructive/50">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+              <p className="text-sm">{exportError}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setExportError(null)}>
+              Fermer
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
@@ -414,14 +447,26 @@ export function ProposalsPage() {
                       {formatDate(proposal.created_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Modifier"
-                        onClick={() => openEdit(proposal)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Modifier"
+                          onClick={() => openEdit(proposal)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Exporter en PDF"
+                          aria-label={`Exporter « ${proposal.title} » en PDF`}
+                          disabled={exportingId === proposal.id}
+                          onClick={() => void handleExport(proposal)}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
