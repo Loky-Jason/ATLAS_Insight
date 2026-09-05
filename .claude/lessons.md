@@ -331,6 +331,25 @@ Le premier format écrit sert de moule au second. Sans extraction préalable, la
 ### Règle
 Avant d'ajouter un second format d'export, extraire d'abord *ce qui est affiché* de *comment c'est affiché* — sinon les deux divergent au premier champ ajouté. Et ne pas transporter dans le nouveau format les contraintes techniques de l'ancien : vérifier lesquelles viennent de la bibliothèque, pas du contenu. Deux actions jumelles dans un journal doivent nommer ce qui les distingue.
 
+## 2026-09-05 — Archivage par lot : ne jamais archiver par requête, et mesurer avant d'optimiser
+### Contexte
+Phase 2.4. `docs/SPEC.md` §5 range l'archivage massif parmi les actions destructives : « confirmation + AuditLog ».
+### Problème
+1. La tentation était un endpoint « archive tout ce qui correspond au filtre ». Un filtre mal compris côté client aurait vidé un catalogue entier sans que personne ne voie quoi, et le journal n'aurait gardé qu'une requête, pas la liste des cours touchés.
+2. `_write_audit` (helper partagé) fait `db.add()` **puis** `await db.flush()`. Réutilisé tel quel dans une boucle, ça fait 200 allers-retours SQLite sur un lot plein. Mesuré : **326 ms** pour 200 cours.
+3. Test `test_batch_requires_admin` en échec au premier jet : le 403 déclenche le `rollback` de l'override `get_db`, qui annulait les cours créés par un simple `flush` dans le helper de test. Artefact de harnais, pas bug de code — mais il aurait pu être lu comme tel.
+### Cause
+Réutiliser un helper conçu pour un appel unitaire dans une boucle : sa granularité de flush devient un coût. Et l'ergonomie « archiver le résultat du filtre » paraît plus simple qu'elle n'est sûre.
+### Solution
+- Le serveur reçoit une **liste explicite d'identifiants**, jamais un filtre. Le client filtre et coche. Borne dure à 200, doublons refusés (ils fausseraient le décompte rendu à l'utilisateur).
+- Réponse ventilée `archived` / `skipped` / `not_found` : partiel toléré, un id inconnu n'annule pas le reste. Idempotent.
+- **Un AuditLog par cours**, avec la même action `archive_course` que l'archivage unitaire — « qui a archivé ce cours-là » se répond pareil, que ce soit en lot ou à l'unité.
+- Journaux ajoutés sans flush intermédiaire : **326 ms → ~128 ms** sur 200 cours.
+- Helper de test : `commit` au lieu de `flush`, avec le pourquoi en commentaire.
+- UI : cases à cocher (cours actifs seulement), « tout sélectionner » portant sur les lignes filtrées, dialogue de confirmation **nommant le nombre**, admin uniquement.
+### Règle
+Une action de masse prend des identifiants, jamais un critère : ce que l'utilisateur a vu et coché doit être exactement ce que le serveur modifie. Un helper qui flushe à chaque appel ne se réutilise pas tel quel dans une boucle — mesurer avant et après plutôt que de supposer dans un sens ou dans l'autre. Et pour la traçabilité, garder le même nom d'action en lot qu'à l'unité.
+
 ### Piège worktree (2026-09-05)
 Le premier lancement des serveurs se faisait sur `backend/data/atlas.db` **du worktree** : 0 utilisateur, 0 cours. Aucune connexion n'était possible, quels que soient les identifiants — et rien dans l'UI ne le disait (juste un échec de login). La base réelle est celle du repo principal ; en worktree, passer `DATABASE_URL` explicitement.
 Corollaire : avant de conclure « les identifiants sont faux », vérifier que la table `users` n'est pas simplement vide.

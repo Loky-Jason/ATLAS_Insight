@@ -164,7 +164,7 @@ GapRecommendation (approved)
 | **2.1** Export PDF (**fpdf2**) | P0 | Phase 1 complète | ✅ 2026-09-05 — `GET /export/proposals/{id}.pdf` + bouton Propositions |
 | **2.2** Export Word (python-docx) | P0 | Phase 1 complète | ✅ 2026-09-05 — `GET /export/proposals/{id}.docx`, contenu partagé avec le PDF |
 | **2.3** Archives view frontend | P1 | Phase 1 | ✅ 2026-09-05 — frontend seul, aucun endpoint nouveau |
-| **2.4** Archivage avancé (batch, filtre) | P1 | Phase 1 | 📅 |
+| **2.4** Archivage avancé (batch, filtre) | P1 | Phase 1 | ✅ 2026-09-05 — `POST /courses/archive-batch` + sélection/confirmation dans Cours SCAP |
 | **2.5** Migration M365/Entra ID | P2 | Phases 0-2 stables | 📅 |
 | **2.6** Tests Phase 2 | P1 | Chaque module | 📅 |
 

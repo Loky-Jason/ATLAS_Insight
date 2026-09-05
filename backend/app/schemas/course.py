@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Borne dure du lot : évite une transaction géante sur SQLite.
+MAX_BATCH_SIZE = 200
 
 
 class CourseCreate(BaseModel):
@@ -30,6 +33,32 @@ class CourseUpdate(BaseModel):
     year: int | None = Field(default=None, ge=1900, le=2100)
     hours_estimated: float | None = Field(default=None, ge=0)
     notes: str | None = None
+
+
+class CourseArchiveBatch(BaseModel):
+    """Lot d'archivage : liste explicite d'identifiants, jamais un filtre.
+
+    Le serveur n'archive pas « tout ce qui correspond à une requête » — un
+    filtre mal compris côté client viderait un catalogue sans que personne ne
+    voie quoi. Le client filtre et coche ; le serveur reçoit la liste.
+    """
+
+    course_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_SIZE)
+
+    @field_validator("course_ids")
+    @classmethod
+    def _reject_duplicates(cls, value: list[int]) -> list[int]:
+        if len(set(value)) != len(value):
+            raise ValueError("La liste contient des identifiants en double.")
+        return value
+
+
+class CourseArchiveBatchResult(BaseModel):
+    """Ventilation du lot : ce qui a été fait, ignoré, ou introuvable."""
+
+    archived: list[int]
+    skipped: list[int]
+    not_found: list[int]
 
 
 class CourseRead(BaseModel):

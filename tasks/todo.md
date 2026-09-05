@@ -31,7 +31,10 @@
       `POST /{id}/restore` et les helpers client existaient déjà). Cours archivés +
       recherche + restauration admin, et recommandations validées. 14 tests.
       Parcours navigateur validé le 2026-09-05 (restauration réelle + AuditLog vérifié en base)
-- [ ] **2.4** Archivage avancé (batch, filtres) — après stabilisation de 2.1–2.3
+- [x] **2.4** Archivage par lot — `POST /courses/archive-batch` (admin, liste explicite
+      d'ids, jamais un filtre), réponse ventilée archived/skipped/not_found, 1 AuditLog
+      par cours. UI : cases à cocher + confirmation nommant le nombre. 13 tests back, 11 front.
+      Reste à faire : **le parcours réel** (sélectionner, confirmer, vérifier Archives)
 - [ ] **2.5** Migration M365 / Entra ID — reporté
 
 ## Spécifications à rédiger avant implémentation

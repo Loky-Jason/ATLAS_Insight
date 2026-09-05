@@ -324,6 +324,19 @@ export const coursesApi = {
   update: (id: number, payload: CourseUpdate) => api.patch<Course>(`/courses/${id}`, payload),
   archive: (id: number) => api.post<Course>(`/courses/${id}/archive`),
   restore: (id: number) => api.post<Course>(`/courses/${id}/restore`),
+  archiveBatch: (courseIds: number[]) =>
+    api.post<CourseArchiveBatchResult>('/courses/archive-batch', {
+      course_ids: courseIds,
+    }),
+}
+
+/** Borne serveur du lot d'archivage (`MAX_BATCH_SIZE` côté backend). */
+export const ARCHIVE_BATCH_MAX = 200
+
+export interface CourseArchiveBatchResult {
+  archived: number[]
+  skipped: number[]
+  not_found: number[]
 }
 
 export const marketCoursesApi = {

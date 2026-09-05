@@ -8,7 +8,7 @@ import {
   AlertTriangle,
   Files,
 } from 'lucide-react'
-import { api, ApiError, type Course } from '@/lib/api'
+import { api, ApiError, coursesApi, ARCHIVE_BATCH_MAX, type Course } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -216,6 +216,11 @@ export function CoursesPage() {
   const [yearFilter, setYearFilter] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [confirmBatchOpen, setConfirmBatchOpen] = useState(false)
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [batchMsg, setBatchMsg] = useState<string | null>(null)
+  const [batchError, setBatchError] = useState<string | null>(null)
 
   const fetchCourses = async () => {
     setLoadState('loading')
@@ -288,6 +293,64 @@ export function CoursesPage() {
       await api.post(`/courses/${course.id}/restore`)
     }
     await fetchCourses()
+  }
+
+  // Seuls des cours actifs peuvent être archivés : la sélection les ignore.
+  const selectableIds = useMemo(
+    () => filtered.filter((c) => c.status === 'active').map((c) => c.id),
+    [filtered],
+  )
+  const selectedVisibleIds = useMemo(
+    () => selectableIds.filter((id) => selectedIds.has(id)),
+    [selectableIds, selectedIds],
+  )
+  const allVisibleSelected =
+    selectableIds.length > 0 && selectedVisibleIds.length === selectableIds.length
+
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) selectableIds.forEach((id) => next.delete(id))
+      else selectableIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
+
+  const handleBatchArchive = async () => {
+    setBatchError(null)
+    setBatchMsg(null)
+    setBatchRunning(true)
+    try {
+      const result = await coursesApi.archiveBatch(selectedVisibleIds)
+      const parts = [`${result.archived.length} cours archivé(s)`]
+      if (result.skipped.length > 0) {
+        parts.push(`${result.skipped.length} déjà archivé(s)`)
+      }
+      if (result.not_found.length > 0) {
+        parts.push(`${result.not_found.length} introuvable(s)`)
+      }
+      setBatchMsg(parts.join(' · '))
+      setSelectedIds(new Set())
+      setConfirmBatchOpen(false)
+      await fetchCourses()
+    } catch (err) {
+      setBatchError(
+        err instanceof ApiError
+          ? `Archivage impossible : ${err.message}`
+          : 'Archivage impossible : erreur inconnue.',
+      )
+    } finally {
+      setBatchRunning(false)
+    }
   }
 
   if (loadState === 'loading') {
@@ -386,6 +449,60 @@ export function CoursesPage() {
         </CardContent>
       </Card>
 
+      {batchMsg && (
+        <Card className="border-primary/40">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <p className="text-sm">{batchMsg}</p>
+            <Button variant="ghost" size="sm" onClick={() => setBatchMsg(null)}>
+              Fermer
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {batchError && (
+        <Card className="border-destructive/50">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+              <p className="text-sm">{batchError}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setBatchError(null)}>
+              Fermer
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && selectedVisibleIds.length > 0 && (
+        <Card className="border-primary/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm">
+              <span className="font-medium">{selectedVisibleIds.length}</span> cours
+              sélectionné{selectedVisibleIds.length > 1 ? 's' : ''}
+              {selectedVisibleIds.length > ARCHIVE_BATCH_MAX && (
+                <span className="text-destructive">
+                  {' '}— maximum {ARCHIVE_BATCH_MAX} par lot
+                </span>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Annuler la sélection
+              </Button>
+              <Button
+                size="sm"
+                disabled={selectedVisibleIds.length > ARCHIVE_BATCH_MAX}
+                onClick={() => setConfirmBatchOpen(true)}
+              >
+                <Archive className="mr-2 h-4 w-4" aria-hidden="true" />
+                Archiver la sélection
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
@@ -408,6 +525,18 @@ export function CoursesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
+                  {isAdmin && (
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        aria-label="Sélectionner tous les cours actifs affichés"
+                        className="h-4 w-4 cursor-pointer accent-primary"
+                        checked={allVisibleSelected}
+                        disabled={selectableIds.length === 0}
+                        onChange={toggleAllVisible}
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Titre</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Catégorie</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Statut</th>
@@ -421,6 +550,18 @@ export function CoursesPage() {
               <tbody>
                 {filtered.map((course) => (
                   <tr key={course.id} className="border-b border-border last:border-0 hover:bg-muted/50">
+                    {isAdmin && (
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Sélectionner « ${course.title} »`}
+                          className="h-4 w-4 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+                          checked={selectedIds.has(course.id)}
+                          disabled={course.status !== 'active'}
+                          onChange={() => toggleOne(course.id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium">{course.title}</td>
                     <td className="px-4 py-3 text-muted-foreground">{course.category}</td>
                     <td className="px-4 py-3">
@@ -476,6 +617,35 @@ export function CoursesPage() {
         course={editingCourse}
         onSave={handleSave}
       />
+
+      <Dialog open={confirmBatchOpen} onOpenChange={setConfirmBatchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archiver la sélection ?</DialogTitle>
+            <DialogDescription>
+              {selectedVisibleIds.length} cours vont passer au statut « Archivé ». Ils
+              resteront consultables dans Archives et pourront être restaurés. Chaque
+              archivage est journalisé.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={batchRunning}>
+                Annuler
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              disabled={batchRunning}
+              onClick={() => void handleBatchArchive()}
+            >
+              {batchRunning
+                ? 'Archivage...'
+                : `Archiver ${selectedVisibleIds.length} cours`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
