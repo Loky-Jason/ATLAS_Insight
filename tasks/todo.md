@@ -19,8 +19,10 @@
 
 ## Phase 2 — prochaine
 
-- [ ] **2.1** Export PDF (WeasyPrint) — endpoint + bouton front (une feature backend
-      non atteignable depuis l'UI n'est pas livrée)
+- [x] **2.1** Export PDF (**fpdf2**, pas WeasyPrint — décision 2026-09-05, SPEC mis à jour).
+      `GET /export/proposals/{id}.pdf` + bouton par ligne dans Propositions. 20 tests back,
+      7 front. GET sûr : n'écrit pas le statut `exported`, mais trace un AuditLog.
+      Reste à faire : **le clic réel** (téléchargement navigateur, non testable en jsdom)
 - [ ] **2.2** Export Word (python-docx) — réutiliser la couche de récupération de 2.1
 - [x] **2.3** Vue Archives front — **aucun endpoint nouveau** (`GET /courses?status=archived`,
       `POST /{id}/restore` et les helpers client existaient déjà). Cours archivés +
@@ -31,7 +33,7 @@
 
 ## Spécifications à rédiger avant implémentation
 
-- [ ] `specs/export-pdf.md` (2.1)
+- [x] `specs/export-pdf.md` (2.1)
 - [ ] `specs/export-word.md` (2.2)
 - [ ] `specs/archives-view.md` (2.3)
 

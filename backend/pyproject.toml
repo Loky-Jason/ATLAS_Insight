@@ -25,6 +25,9 @@ dependencies = [
     "httpx>=0.28.1",
     "beautifulsoup4>=4.15.0",
     "lxml>=5.3.0",
+    # Export PDF : fpdf2 plutôt que WeasyPrint (pur Python, pas de GTK/Pango
+    # à installer sur les postes Windows). Cf. specs/export-pdf.md.
+    "fpdf2>=2.8.0",
 ]
 
 [project.optional-dependencies]

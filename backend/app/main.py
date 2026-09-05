@@ -17,6 +17,7 @@ from app.api.certification import router as certification_router
 from app.api.courses import router as courses_router
 from app.api.dashboard import router as dashboard_router
 from app.api.estimate import router as estimate_router
+from app.api.export import router as export_router
 from app.api.favorites import router as favorites_router
 from app.api.gap_recommendations import router as gap_recommendations_router
 from app.api.imports import router as imports_router
@@ -79,6 +80,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(certification_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
 app.include_router(estimate_router, prefix="/api/v1")
+app.include_router(export_router, prefix="/api/v1")
 app.include_router(favorites_router, prefix="/api/v1")
 app.include_router(imports_router, prefix="/api/v1")
 app.include_router(market_router, prefix="/api/v1")

@@ -296,6 +296,22 @@ Le parcours navigateur a été fait **par Paul**, pas par moi : la connexion exi
 
 **Règle :** quand une vérification exige des identifiants, ne pas la déclarer faite ni la contourner — la déléguer explicitement et dire précisément quoi cliquer. Puis confirmer le résultat par la base, pas par la parole.
 
+## 2026-09-05 — Export PDF : assainissement latin-1 mort et révocation de blob trop tôt
+### Contexte
+Phase 2.1, export PDF d'une `CourseProposal`. fpdf2 retenu contre le SPEC (qui nommait WeasyPrint) : GTK/Pango à installer sur chaque poste Windows de la Mairie contre zéro dépendance native.
+### Problème
+1. `_to_latin1` avait un bloc censé retirer les caractères non représentables. Il ne retirait **rien** : `char.encode("latin-1", errors="ignore")` renvoie `b""` (falsy) pour un caractère hors latin-1, et la condition retombait alors sur `category != "Cc"` qui est vraie — donc le caractère était gardé, puis supprimé de toute façon par l'encodage final. Code mort. Pire, les **caractères de contrôle** (`\x00`, `\x07`) *sont* valides en latin-1 : ils traversaient intacts jusque dans le PDF. Vérifié : `_to_latin1("A\x00B\x07C")` renvoyait la chaîne inchangée.
+2. Front : `URL.revokeObjectURL` appelé dans le `finally`, donc dans le même tick que `link.click()`. Certains navigateurs n'ont pas encore lu le blob → téléchargement annulé. Aucun test ne pouvait l'attraper, jsdom ne télécharge rien.
+3. Le test de typographie utilisait une apostrophe droite `'` et ne couvrait donc pas U+2019, le cas le plus fréquent en français.
+### Cause
+Assainissement écrit « à l'instinct » sans vérifier ce que chaque passe filtre réellement. La condition mélangeait deux tests sans rapport, et l'intuition « latin-1 = imprimable » est fausse : latin-1 contient les caractères de contrôle.
+### Solution
+- Trois passes explicites : remplacements typographiques → retrait des catégories Unicode `Cc/Cf/Cs/Co/Cn` (sauf `\n` et `\t`) → encodage latin-1.
+- Révocation différée via `setTimeout(..., 0)`, avec le pourquoi en commentaire.
+- Tests ajoutés : contrôle retiré, sauts de ligne gardés, apostrophe courbe, et un `afterEach` qui draine les timers différés (sinon ils polluent les compteurs du test suivant).
+### Règle
+Un filtre de caractères se vérifie en l'exécutant sur les cas limites, pas en le relisant : écrire la sonde (`_to_latin1("A\x00B")`) avant de croire le code. « Encodable en latin-1 » ≠ « imprimable » — les caractères de contrôle passent. Et ne jamais révoquer une object URL dans le même tick que le clic qui la consomme.
+
 ### Piège worktree (2026-09-05)
 Le premier lancement des serveurs se faisait sur `backend/data/atlas.db` **du worktree** : 0 utilisateur, 0 cours. Aucune connexion n'était possible, quels que soient les identifiants — et rien dans l'UI ne le disait (juste un échec de login). La base réelle est celle du repo principal ; en worktree, passer `DATABASE_URL` explicitement.
 Corollaire : avant de conclure « les identifiants sont faux », vérifier que la table `users` n'est pas simplement vide.
