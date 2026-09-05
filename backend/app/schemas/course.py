@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -43,7 +44,9 @@ class CourseArchiveBatch(BaseModel):
     voie quoi. Le client filtre et coche ; le serveur reçoit la liste.
     """
 
-    course_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_SIZE)
+    course_ids: list[Annotated[int, Field(ge=1)]] = Field(
+        min_length=1, max_length=MAX_BATCH_SIZE
+    )
 
     @field_validator("course_ids")
     @classmethod

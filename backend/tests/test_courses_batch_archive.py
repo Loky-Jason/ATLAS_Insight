@@ -202,6 +202,34 @@ async def test_single_archive_still_works(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_batch_bumps_updated_at(client, db_session):
+    """Contrat avec la page Archives, qui affiche `updated_at` comme date d'archivage.
+
+    Repose sur `onupdate` du modèle : sans ce test, le retirer casserait la
+    colonne « Dernière modification » sans qu'aucune suite ne le signale.
+    """
+    await _register_and_login(client, "admin@test.com")
+    ids = await _make_courses(db_session, 1)
+    result = await db_session.execute(select(Course).where(Course.id == ids[0]))
+    course = result.scalar_one()
+    before = course.updated_at
+
+    await client.post(BATCH_URL, json={"course_ids": ids})
+    await db_session.refresh(course)
+
+    assert course.updated_at > before
+
+
+@pytest.mark.asyncio
+async def test_batch_rejects_non_positive_ids(client):
+    """Un identifiant nul ou négatif n'existe pas : le refuser plutôt que le
+    faire remonter en `not_found`."""
+    await _register_and_login(client, "admin@test.com")
+    resp = await client.post(BATCH_URL, json={"course_ids": [0]})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_batch_route_not_shadowed_by_course_id_route(client, db_session):
     """`archive-batch` ne doit pas être capté par `/{course_id}/archive`."""
     await _register_and_login(client, "admin@test.com")

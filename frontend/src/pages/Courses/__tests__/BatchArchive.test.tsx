@@ -94,6 +94,24 @@ describe('Sélection', () => {
     expect(screen.getByLabelText('Sélectionner « Cours 3 »')).not.toBeChecked()
   })
 
+  it('marque « tout sélectionner » comme indéterminé en sélection partielle', async () => {
+    await renderPage()
+    const selectAll = screen.getByLabelText(
+      'Sélectionner tous les cours actifs affichés',
+    ) as HTMLInputElement
+
+    expect(selectAll.indeterminate).toBe(false)
+
+    fireEvent.click(screen.getByLabelText('Sélectionner « Cours 1 »'))
+    // Sans l'état indéterminé, un lot en cours s'affiche comme « rien de coché ».
+    expect(selectAll.indeterminate).toBe(true)
+    expect(selectAll.checked).toBe(false)
+
+    fireEvent.click(screen.getByLabelText('Sélectionner « Cours 2 »'))
+    expect(selectAll.indeterminate).toBe(false)
+    expect(selectAll.checked).toBe(true)
+  })
+
   it('ne propose la barre d’action qu’une fois quelque chose de coché', async () => {
     await renderPage()
 

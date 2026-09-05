@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import {
   Search,
   Plus,
@@ -306,6 +306,17 @@ export function CoursesPage() {
   )
   const allVisibleSelected =
     selectableIds.length > 0 && selectedVisibleIds.length === selectableIds.length
+  const someVisibleSelected =
+    selectedVisibleIds.length > 0 && !allVisibleSelected
+
+  // `indeterminate` n'existe qu'en propriété DOM, pas en attribut : sans ça une
+  // sélection partielle affiche une case vide, donc « rien de sélectionné ».
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected
+    }
+  }, [someVisibleSelected])
 
   const toggleOne = (id: number) => {
     setSelectedIds((prev) => {
@@ -528,6 +539,7 @@ export function CoursesPage() {
                   {isAdmin && (
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                       <input
+                        ref={selectAllRef}
                         type="checkbox"
                         aria-label="Sélectionner tous les cours actifs affichés"
                         className="h-4 w-4 cursor-pointer accent-primary"
