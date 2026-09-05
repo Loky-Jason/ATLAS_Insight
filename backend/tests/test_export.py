@@ -6,16 +6,21 @@ Contrats vérifiés : `specs/export-pdf.md`.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from io import BytesIO
 
 import pytest
+from docx import Document
 from sqlalchemy import select
 
+from app.api.export import DOCX_MEDIA_TYPE
 from app.models.audit_log import AuditLog
 from app.models.course_proposal import CourseProposal
 from app.services.export_service import (
     _format_json_field,
     _to_latin1,
+    build_proposal_content,
     build_proposal_filename,
+    render_proposal_docx,
     render_proposal_pdf,
 )
 
@@ -124,11 +129,27 @@ async def test_export_writes_audit_log(client, db_session):
     await client.get(f"/api/v1/export/proposals/{proposal_id}.pdf")
 
     result = await db_session.execute(
-        select(AuditLog).where(AuditLog.action == "export_proposal")
+        select(AuditLog).where(AuditLog.action == "export_proposal_pdf")
     )
     logs = list(result.scalars().all())
     assert len(logs) == 1
     assert logs[0].target == f"course_proposal:{proposal_id}"
+
+
+@pytest.mark.asyncio
+async def test_export_audit_actions_name_their_format(client, db_session):
+    """Les deux formats doivent être distinguables en analyse de journal."""
+    await _register_and_login(client, "admin@test.com")
+    proposal_id = await _create_proposal(client)
+
+    await client.get(f"/api/v1/export/proposals/{proposal_id}.pdf")
+    await client.get(f"/api/v1/export/proposals/{proposal_id}.docx")
+
+    result = await db_session.execute(
+        select(AuditLog).where(AuditLog.action.like("export_proposal%"))
+    )
+    actions = sorted(log.action for log in result.scalars().all())
+    assert actions == ["export_proposal_docx", "export_proposal_pdf"]
 
 
 @pytest.mark.asyncio
@@ -221,9 +242,149 @@ def test_format_json_field_passes_through_invalid_json():
 
 def test_filename_is_slugified():
     proposal = _make_proposal(id=7, title="Excel — perfectionnement (avancé) !")
-    assert build_proposal_filename(proposal) == "proposition-7-excel-perfectionnement-avance.pdf"
+    assert (
+        build_proposal_filename(proposal, "pdf")
+        == "proposition-7-excel-perfectionnement-avance.pdf"
+    )
 
 
 def test_filename_falls_back_when_title_has_no_ascii():
     proposal = _make_proposal(id=3, title="日本語")
-    assert build_proposal_filename(proposal) == "proposition-3-proposition.pdf"
+    assert build_proposal_filename(proposal, "pdf") == "proposition-3-proposition.pdf"
+
+
+def test_filename_carries_requested_extension():
+    proposal = _make_proposal(id=7, title="Excel")
+    assert build_proposal_filename(proposal, "docx") == "proposition-7-excel.docx"
+
+
+# ---------------------------------------------------------------------------
+# Export Word (Phase 2.2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_export_docx_returns_word_document(client):
+    await _register_and_login(client, "admin@test.com")
+    proposal_id = await _create_proposal(client)
+
+    resp = await client.get(f"/api/v1/export/proposals/{proposal_id}.docx")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == DOCX_MEDIA_TYPE
+    # Un .docx est une archive ZIP.
+    assert resp.content.startswith(b"PK")
+    assert len(resp.content) > 5000
+
+
+@pytest.mark.asyncio
+async def test_export_docx_sets_download_filename(client):
+    await _register_and_login(client, "admin@test.com")
+    proposal_id = await _create_proposal(client, title="Excel perfectionnement")
+
+    resp = await client.get(f"/api/v1/export/proposals/{proposal_id}.docx")
+
+    assert (
+        f'filename="proposition-{proposal_id}-excel-perfectionnement.docx"'
+        in resp.headers["content-disposition"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_export_docx_unknown_proposal_returns_404(client):
+    await _register_and_login(client, "admin@test.com")
+    resp = await client.get("/api/v1/export/proposals/9999.docx")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_export_docx_unauthenticated_returns_401(client):
+    resp = await client.get("/api/v1/export/proposals/1.docx")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_export_docx_does_not_modify_proposal(client):
+    await _register_and_login(client, "admin@test.com")
+    proposal_id = await _create_proposal(client, status="draft")
+
+    await client.get(f"/api/v1/export/proposals/{proposal_id}.docx")
+
+    resp = await client.get(f"/api/v1/proposals/{proposal_id}")
+    assert resp.json()["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_export_docx_writes_audit_log(client, db_session):
+    await _register_and_login(client, "admin@test.com")
+    proposal_id = await _create_proposal(client)
+
+    await client.get(f"/api/v1/export/proposals/{proposal_id}.docx")
+
+    result = await db_session.execute(
+        select(AuditLog).where(AuditLog.action == "export_proposal_docx")
+    )
+    logs = list(result.scalars().all())
+    assert len(logs) == 1
+    assert logs[0].target == f"course_proposal:{proposal_id}"
+
+
+def _docx_text(data: bytes) -> str:
+    return "\n".join(p.text for p in Document(BytesIO(data)).paragraphs)
+
+
+def test_render_docx_contains_title_and_sections():
+    text = _docx_text(render_proposal_docx(_make_proposal()))
+
+    assert "Excel perfectionnement" in text
+    assert "Statut : Proposé" in text
+    for heading in (
+        "Heures estimées",
+        "Description",
+        "Pistes de certification",
+        "Éléments d'origine",
+    ):
+        assert heading in text
+
+
+def test_render_docx_keeps_non_latin1_characters():
+    """Différence assumée avec le PDF : le .docx est de l'UTF-8, rien n'est retiré."""
+    text = _docx_text(
+        render_proposal_docx(_make_proposal(title="Formation 日本語 🎓"))
+    )
+    assert "日本語" in text
+    assert "🎓" in text
+
+
+def test_render_docx_shows_dash_for_empty_fields():
+    text = _docx_text(
+        render_proposal_docx(
+            _make_proposal(
+                description=None,
+                hours_estimated=None,
+                certification_suggestions=None,
+                based_on=None,
+            )
+        )
+    )
+    assert "None" not in text
+    assert "—" in text
+
+
+def test_render_docx_survives_invalid_json():
+    data = render_proposal_docx(
+        _make_proposal(certification_suggestions="{pas du json", based_on="[[[")
+    )
+    assert data.startswith(b"PK")
+
+
+def test_pdf_and_docx_share_the_same_content_source():
+    """Un champ ajouté doit apparaître dans les deux formats sans double saisie."""
+    proposal = _make_proposal()
+    content = build_proposal_content(proposal)
+    text = _docx_text(render_proposal_docx(proposal))
+
+    assert content.title in text
+    assert content.subtitle in text
+    for heading, body in content.sections:
+        assert heading in text
+        assert body in text

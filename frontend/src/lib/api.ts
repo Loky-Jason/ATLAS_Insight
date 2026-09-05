@@ -305,6 +305,8 @@ export const gapApi = {
 export const exportApi = {
   proposalPdf: (id: number) =>
     downloadFile(`/export/proposals/${id}.pdf`, `proposition-${id}.pdf`),
+  proposalDocx: (id: number) =>
+    downloadFile(`/export/proposals/${id}.docx`, `proposition-${id}.docx`),
 }
 
 export const coursesApi = {

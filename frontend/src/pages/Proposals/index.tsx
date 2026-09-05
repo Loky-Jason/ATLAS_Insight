@@ -4,6 +4,7 @@ import {
   Plus,
   Pencil,
   FileDown,
+  FileText,
   AlertTriangle,
   Lightbulb,
 } from 'lucide-react'
@@ -226,14 +227,17 @@ export function ProposalsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProposal, setEditingProposal] = useState<CourseProposal | null>(null)
-  const [exportingId, setExportingId] = useState<number | null>(null)
+  // Une seule ligne peut être en cours d'export à la fois, tous formats confondus.
+  const [exportingKey, setExportingKey] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const handleExport = async (proposal: CourseProposal) => {
+  const handleExport = async (proposal: CourseProposal, format: 'pdf' | 'docx') => {
     setExportError(null)
-    setExportingId(proposal.id)
+    setExportingKey(`${proposal.id}-${format}`)
     try {
-      await exportApi.proposalPdf(proposal.id)
+      await (format === 'pdf'
+        ? exportApi.proposalPdf(proposal.id)
+        : exportApi.proposalDocx(proposal.id))
     } catch (err) {
       setExportError(
         err instanceof ApiError
@@ -241,7 +245,7 @@ export function ProposalsPage() {
           : 'Export impossible : erreur inconnue.',
       )
     } finally {
-      setExportingId(null)
+      setExportingKey(null)
     }
   }
 
@@ -461,10 +465,20 @@ export function ProposalsPage() {
                           size="icon"
                           title="Exporter en PDF"
                           aria-label={`Exporter « ${proposal.title} » en PDF`}
-                          disabled={exportingId === proposal.id}
-                          onClick={() => void handleExport(proposal)}
+                          disabled={exportingKey === `${proposal.id}-pdf`}
+                          onClick={() => void handleExport(proposal, 'pdf')}
                         >
                           <FileDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Exporter en Word"
+                          aria-label={`Exporter « ${proposal.title} » en Word`}
+                          disabled={exportingKey === `${proposal.id}-docx`}
+                          onClick={() => void handleExport(proposal, 'docx')}
+                        >
+                          <FileText className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>

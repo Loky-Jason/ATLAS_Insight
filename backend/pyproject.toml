@@ -28,6 +28,8 @@ dependencies = [
     # Export PDF : fpdf2 plutôt que WeasyPrint (pur Python, pas de GTK/Pango
     # à installer sur les postes Windows). Cf. specs/export-pdf.md.
     "fpdf2>=2.8.0",
+    # Export Word editable. Cf. specs/export-word.md.
+    "python-docx>=1.1.0",
 ]
 
 [project.optional-dependencies]
