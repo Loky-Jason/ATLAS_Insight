@@ -25,7 +25,7 @@
 - [x] **2.3** Vue Archives front — **aucun endpoint nouveau** (`GET /courses?status=archived`,
       `POST /{id}/restore` et les helpers client existaient déjà). Cours archivés +
       recherche + restauration admin, et recommandations validées. 14 tests.
-      Reste à faire : **le parcours navigateur réel** (login requis)
+      Parcours navigateur validé le 2026-09-05 (restauration réelle + AuditLog vérifié en base)
 - [ ] **2.4** Archivage avancé (batch, filtres) — après stabilisation de 2.1–2.3
 - [ ] **2.5** Migration M365 / Entra ID — reporté
 

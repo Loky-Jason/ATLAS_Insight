@@ -291,5 +291,11 @@ Un défaut de pagination côté serveur est invisible depuis le client : la rép
 ### Règle
 Avant d'afficher un compteur issu d'une liste API, vérifier le `limit` **par défaut** de l'endpoint : `len(réponse)` n'est un total que si l'endpoint n'a pas de pagination. À ras du plafond, dire que c'est tronqué plutôt que d'afficher un total faux. Et vérifier qu'un endpoint existant ne suffit pas avant d'en écrire un nouveau — ici toute la Phase 2.3 était du frontend.
 
-### Limite de vérification (2026-09-05)
-Le parcours navigateur (G8) n'a **pas** été fait sur cette page : il exige de saisir un mot de passe dans le formulaire de login, ce que je ne fais pas. Vérifié à la place : endpoints présents et protégés (401, pas 404), 103 tests vitest, `tsc` et `build` verts. **Le clic réel reste à faire côté humain.**
+### Vérification G8 (2026-09-05)
+Le parcours navigateur a été fait **par Paul**, pas par moi : la connexion exige de saisir un mot de passe, ce que je ne fais pas. Côté agent : endpoints protégés (401, pas 404), 103 tests vitest, `tsc` et `build` verts. Côté humain : page affichée, « Excel perfectionnement » restauré. Confirmé en base — statut repassé à `active`, 0 cours archivé restant, `AuditLog` `restore_course/course:1` écrit.
+
+**Règle :** quand une vérification exige des identifiants, ne pas la déclarer faite ni la contourner — la déléguer explicitement et dire précisément quoi cliquer. Puis confirmer le résultat par la base, pas par la parole.
+
+### Piège worktree (2026-09-05)
+Le premier lancement des serveurs se faisait sur `backend/data/atlas.db` **du worktree** : 0 utilisateur, 0 cours. Aucune connexion n'était possible, quels que soient les identifiants — et rien dans l'UI ne le disait (juste un échec de login). La base réelle est celle du repo principal ; en worktree, passer `DATABASE_URL` explicitement.
+Corollaire : avant de conclure « les identifiants sont faux », vérifier que la table `users` n'est pas simplement vide.
