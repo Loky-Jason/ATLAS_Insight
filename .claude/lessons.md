@@ -270,5 +270,32 @@ Confiance implicite dans un document servi par un tiers. La validation anti-SSRF
 - Chaque `<loc>` passe `validate_external_url` **et** `is_same_site`, avec log du nombre d'URLs écartées.
 - Override affaibli de `generic.py` supprimé (réutilise la base) → un seul point de contrôle.
 - 7 tests, dont sitemaps hostiles (localhost, 169.254.169.254, `file://`, domaine tiers, suffixe `www.orsys.fr.evil.example.com`, hôte à label unique).
-### Règle
+### Règle (SSRF sitemap)
 Toute URL issue d'un document distant (sitemap, JSON-LD, `href` scrappé) est une entrée non fiable : la valider **au point de sortie réseau**, pas seulement à la saisie. Anchor de l'allowlist = l'hôte du document qui l'a fournie. Ne jamais redéfinir dans une sous-classe un helper porteur d'un contrôle de sécurité en version affaiblie — étendre le helper partagé. Un filtre codé en dur partagé par plusieurs adaptateurs échoue en silence (0 résultat) : le rendre paramétrable.
+
+## 2026-09-05 — Vue Archives : compteur menteur et liste non bornée
+### Contexte
+Phase 2.3, page Archives (cours archivés + recommandations validées). Le todo demandait de vérifier d'abord si un endpoint existant suffisait.
+### Problème
+1. **Aucun code backend n'était nécessaire** : `GET /courses?status=archived`, `POST /courses/{id}/restore` (admin + AuditLog) et les helpers `coursesApi` / `gapApi` existaient déjà. Sans cette vérification, on écrivait un endpoint en double.
+2. Revue : `gapApi.list()` sans `limit` → le serveur plafonne **silencieusement à 50** (`limit: int = Query(default=50, ge=1, le=200)`). Le compteur « (N) » de l'en-tête aurait affiché *50* alors qu'il pouvait y avoir 300 recommandations validées — **chiffre faux dans une vue décisionnelle**.
+3. Revue : `GET /courses` n'a **aucune borne** serveur, et la page rendait toutes les lignes d'un bloc — contraire à la règle CLAUDE.md « rendu progressif au-delà de 100 éléments » sur des postes peu puissants.
+4. Après restauration, un `fetchAll()` rechargeait aussi les recommandations, qu'une restauration ne modifie pas.
+### Cause
+Un défaut de pagination côté serveur est invisible depuis le client : la réponse est bien formée, juste tronquée. Rien dans le type `GapRecommendationList[]` ne signale la troncature.
+### Solution
+- `limit: 200` explicite (plafond serveur) + mention « Affichage limité aux 200… » quand `length === limit`, et « (200 affichées) » au lieu de « (200) ».
+- Rendu plafonné à 100 lignes + bouton « Afficher les N cours restants ».
+- Restauration → ne recharge que les cours.
+- 14 tests, dont troncature, seuil de dépliage, non-rechargement des recommandations.
+### Règle
+Avant d'afficher un compteur issu d'une liste API, vérifier le `limit` **par défaut** de l'endpoint : `len(réponse)` n'est un total que si l'endpoint n'a pas de pagination. À ras du plafond, dire que c'est tronqué plutôt que d'afficher un total faux. Et vérifier qu'un endpoint existant ne suffit pas avant d'en écrire un nouveau — ici toute la Phase 2.3 était du frontend.
+
+### Vérification G8 (2026-09-05)
+Le parcours navigateur a été fait **par Paul**, pas par moi : la connexion exige de saisir un mot de passe, ce que je ne fais pas. Côté agent : endpoints protégés (401, pas 404), 103 tests vitest, `tsc` et `build` verts. Côté humain : page affichée, « Excel perfectionnement » restauré. Confirmé en base — statut repassé à `active`, 0 cours archivé restant, `AuditLog` `restore_course/course:1` écrit.
+
+**Règle :** quand une vérification exige des identifiants, ne pas la déclarer faite ni la contourner — la déléguer explicitement et dire précisément quoi cliquer. Puis confirmer le résultat par la base, pas par la parole.
+
+### Piège worktree (2026-09-05)
+Le premier lancement des serveurs se faisait sur `backend/data/atlas.db` **du worktree** : 0 utilisateur, 0 cours. Aucune connexion n'était possible, quels que soient les identifiants — et rien dans l'UI ne le disait (juste un échec de login). La base réelle est celle du repo principal ; en worktree, passer `DATABASE_URL` explicitement.
+Corollaire : avant de conclure « les identifiants sont faux », vérifier que la table `users` n'est pas simplement vide.
